@@ -11,8 +11,8 @@ of windows, with replace: there is one form at a time, and a double click
 on another row closes the form open and opens it on that row. It is not
 modal, so the list stays usable behind it.
 
-A new reading has date and time following the clock for as long as nobody
-touches them. A form left open from the morning would otherwise stamp an
+A new reading has date and time following the clock, the time to the
+minute, for as long as nobody touches them. A form left open from the morning would otherwise stamp an
 evening reading with the morning's time, and that is a wrong datum nobody
 would notice. The form remembers what it last wrote in the two fields:
 when they no longer say that, a person has changed them, and the clock
@@ -167,12 +167,21 @@ class Reading(tk.Toplevel):
     # --- the clock -----------------------------------------------------------
 
     def set_now(self):
-        now = datetime.datetime.now().replace(microsecond=0)
+        """Date and time of the clock, the time to the minute.
+
+        Seconds running in a field only catch the eye; they are taken from
+        the clock when the reading is saved, where they keep two readings
+        of the same minute apart. Written only when it changes, so the
+        field stays still between one minute and the next.
+        """
+        now = datetime.datetime.now()
         if self.date.get_date() != now.date():
             self.date.set_date(now.date())
-        self.time.set(now.strftime("%H:%M:%S"))
+        shown = now.strftime("%H:%M")
+        if self.time.get() != shown:
+            self.time.set(shown)
         self.shown_date = now.date()
-        self.shown_time = self.time.get()
+        self.shown_time = shown
 
     def is_untouched(self):
         """Whether date and time still say what the form wrote in them."""
@@ -212,12 +221,19 @@ class Reading(tk.Toplevel):
         return found
 
     def get_moment(self):
-        """Date and time together, or None when either is not one."""
-        day = self.date.get_date()
-        time = self.get_time()
+        """Date and time together, or None when either is not one.
+
+        Untouched, they are the clock's, seconds included: the field shows
+        the minute, the reading is stored to the second it was saved.
+        """
         moment = None
-        if day is not None and time is not None:
-            moment = datetime.datetime.combine(day, time)
+        if self.is_untouched():
+            moment = datetime.datetime.now().replace(microsecond=0)
+        else:
+            day = self.date.get_date()
+            time = self.get_time()
+            if day is not None and time is not None:
+                moment = datetime.datetime.combine(day, time)
         return moment
 
     def get_numbers(self):

@@ -251,6 +251,28 @@ class FormTestCase(WindowTestCase):
         form.set_clock()
         self.assertNotEqual(form.time.get(), "00:00:00")
 
+    def test_new_form_shows_the_time_to_the_minute(self):
+        form = self.open_new()
+        self.assertEqual(form.time.get(),
+                         datetime.datetime.now().strftime("%H:%M"))
+
+    def test_untouched_time_is_saved_to_the_second(self):
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66")
+        before = datetime.datetime.now().replace(microsecond=0)
+        form.on_save()
+        after = datetime.datetime.now()
+        stored = self.engine.get_readings(datetime.date.today(),
+                                          datetime.date.today())[0]
+        moment = self.engine.get_moment(stored["recorded_at"])
+        self.assertTrue(before <= moment <= after)
+
+    def test_correction_keeps_the_seconds(self):
+        moment = self.get_today_at(0, 3).replace(second=41)
+        reading_id = self.add(moment, 128, 79)
+        self.main.on_edit(reading_id)
+        self.assertEqual(self.get_form().time.get(), "00:03:41")
+
     def test_time_touched_is_left_alone(self):
         form = self.open_new()
         form.time.set("07:30:00")
