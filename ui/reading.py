@@ -12,11 +12,11 @@ on another row closes the form open and opens it on that row. It is not
 modal, so the list stays usable behind it.
 
 A new reading has date and time following the clock, the time to the
-minute, for as long as nobody touches them. A form left open from the morning would otherwise stamp an
-evening reading with the morning's time, and that is a wrong datum nobody
-would notice. The form remembers what it last wrote in the two fields:
-when they no longer say that, a person has changed them, and the clock
-lets go.
+minute, for as long as nobody touches them. A form left open from the
+morning would otherwise stamp an evening reading with the morning's time,
+and that is a wrong datum nobody would notice. The form remembers what it
+last wrote in the two fields: when they no longer say that, a person has
+changed them, and the clock lets go.
 
 An existing reading opens with Enable ticked or not, as its column says
 (R6). Unticking it takes the reading out of the diary; ticking a
