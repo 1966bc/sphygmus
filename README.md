@@ -1,3 +1,9 @@
+[![Python 3.7+](https://img.shields.io/badge/Python-3.7%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Tkinter](https://img.shields.io/badge/GUI-Tkinter-2B5B84)](https://docs.python.org/3/library/tkinter.html)
+[![SQLite](https://img.shields.io/badge/database-SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![ReportLab](https://img.shields.io/badge/PDF-ReportLab-CC0000)](https://www.reportlab.com/)
+[![Licence: GPL-3.0-or-later](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
+
 # sphygmus
 
 ![sphygmus: the main window, the plot and the report, on invented readings](docs/images/banner.png)
