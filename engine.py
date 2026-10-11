@@ -109,6 +109,11 @@ class Engine:
         """A day the way it is read where the diary is kept: 11/10/2026."""
         return value.strftime(SHOWN_DAY)
 
+    def get_shown_moment(self, moment):
+        """A moment as it is shown: 11/10/2026 08:00:00."""
+        return "{0} {1}".format(self.get_shown_day(moment),
+                                moment.strftime("%H:%M:%S"))
+
     # --- settings ------------------------------------------------------------
 
     def get_setting(self, code):
