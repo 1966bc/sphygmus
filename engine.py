@@ -23,6 +23,7 @@ last of several.
 
 import datetime
 import os
+import shutil
 
 from dbms import DBMS
 from events import Events
@@ -88,6 +89,9 @@ class Engine:
                 self.db.write_script(f.read())
             self.log.trace("built from {0}".format(name))
 
+    def get_backup_folder(self):
+        return os.path.join(os.path.dirname(self.db.database), BACKUP_DIR)
+
     def get_backup_path(self, reason):
         """A new file in backup/, beside the diary, named for the moment.
 
@@ -96,7 +100,7 @@ class Engine:
         """
         if self.db.database == ":memory:":
             raise ValueError("a diary in memory has no file to back up")
-        folder = os.path.join(os.path.dirname(self.db.database), BACKUP_DIR)
+        folder = self.get_backup_folder()
         os.makedirs(folder, exist_ok=True)
         stem = os.path.splitext(os.path.basename(self.db.database))[0]
         stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -117,19 +121,61 @@ class Engine:
         nothing is deleted (R6), and a diary started by mistake is undone
         by moving the file back.
         """
+        path = self.set_aside()
+        self.set_reopened()
+        self.log.trace("new diary; the old one is {0}".format(path))
+        return path
+
+    def check_backup(self, path):
+        """Refuse a file that is not a sound diary of this schema."""
+        version, integrity = self.db.get_file_state(path)
+        if version != SCHEMA_VERSION:
+            raise ValueError("{0} has schema {1}, this program reads {2}"
+                             .format(os.path.basename(path), version,
+                                     SCHEMA_VERSION))
+        if integrity != "ok":
+            raise ValueError("{0} is damaged:\n{1}".format(
+                os.path.basename(path), integrity))
+
+    def restore(self, path):
+        """Put a backup in place of the diary; return where the diary went.
+
+        The backup is checked before anything is touched. The diary in use
+        is moved into backup/ (R6), and the backup is copied, not moved:
+        it stays where it was, and can be restored again.
+        """
+        self.check_backup(path)
+        moved = self.set_aside()
+        try:
+            shutil.copyfile(path, self.db.database)
+        except OSError:
+            # Put the diary back where it was before saying so.
+            os.replace(moved, self.db.database)
+            self.db.set_connection()
+            raise
+        self.set_reopened()
+        self.log.trace("restored {0}; the diary was moved to {1}".format(
+            path, moved))
+        return moved
+
+    def set_aside(self):
+        """Close the diary and move its file into backup/; return the path.
+        """
         path = self.get_backup_path("replaced")
         self.db.close()
         try:
             os.replace(self.db.database, path)
         except OSError:
-            # The old diary is where it was: open it again before saying so.
+            # The diary is where it was: open it again before saying so.
             self.db.set_connection()
             raise
+        return path
+
+    def set_reopened(self):
+        """Open the file at the diary's path, building it if it is new."""
         self.db.dict_tables = {}
         self.db.set_connection()
         self.set_schema()
-        self.log.trace("new diary; the old one is {0}".format(path))
-        return path
 
     def get_query(self, name):
         """A named query, from sql/dql: one file, readable at the shell."""

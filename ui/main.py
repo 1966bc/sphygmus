@@ -17,7 +17,9 @@ period through a function handed to it; the list asks for a reading to be
 opened through another.
 """
 
+import os
 import tkinter as tk
+from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 
@@ -53,16 +55,27 @@ class Main(ttk.Frame):
         root = self.nametowidget(".")
         menubar = tk.Menu(root, tearoff=0)
 
+        # The diary as a file: copies, checks, and leaving.
+        files = tk.Menu(menubar, tearoff=0)
+        files.add_command(label="Back up the diary", underline=0,
+                          command=self.on_backup)
+        files.add_command(label="Restore a backup...", underline=0,
+                          command=self.on_restore)
+        files.add_separator()
+        files.add_command(label="Check the diary", underline=0,
+                          command=self.on_check)
+        files.add_command(label="Vacuum the diary", underline=0,
+                          command=self.on_vacuum)
+        files.add_command(label="Start a new diary...", underline=6,
+                          command=self.on_fresh_diary)
+        files.add_separator()
+        files.add_command(label="Exit", underline=1, command=root.on_exit)
+        menubar.add_cascade(label="File", underline=0, menu=files)
+
+        # The diary as readings.
         diary = tk.Menu(menubar, tearoff=0)
         diary.add_command(label="New reading", underline=0,
                           command=self.on_new)
-        diary.add_separator()
-        diary.add_command(label="Back up the diary", underline=0,
-                          command=self.on_backup)
-        diary.add_command(label="Start a new diary...", underline=0,
-                          command=self.on_fresh_diary)
-        diary.add_separator()
-        diary.add_command(label="Quit", underline=0, command=root.on_exit)
         menubar.add_cascade(label="Diary", underline=0, menu=diary)
 
         helper = tk.Menu(menubar, tearoff=0)
@@ -70,6 +83,7 @@ class Main(ttk.Frame):
         menubar.add_cascade(label="Help", underline=0, menu=helper)
 
         root.configure(menu=menubar)
+        self.mnu_file = files
         self.mnu_diary = diary
         self.mnu_help = helper
 
@@ -161,6 +175,55 @@ class Main(ttk.Frame):
         path = self.engine.backup()
         self.set_status("Backed up to {0}".format(path))
 
+    def on_restore(self, evt=None):
+        """Choose a backup and put it in place of the diary, once asked."""
+        path = filedialog.askopenfilename(
+            parent=self.winfo_toplevel(), title="Restore a backup",
+            initialdir=self.engine.get_backup_folder(),
+            filetypes=(("Diaries", "*.sl3"), ("All files", "*")))
+        if path:
+            name = os.path.basename(path)
+            question = ("Put {0} in place of the diary?\n\nThe diary in use"
+                        " is moved into the backup folder, whole. Nothing is"
+                        " deleted.".format(name))
+            if messagebox.askyesno(APP_NAME, question,
+                                   default=messagebox.NO,
+                                   parent=self.winfo_toplevel()):
+                self.set_restored(path)
+
+    def set_restored(self, path):
+        """Check, then restore; a file that fails the check changes nothing.
+        """
+        self.set_forms_closed()
+        moved = self.engine.restore(path)
+        self.set_diary_replaced()
+        self.set_status("Restored {0}. The diary was moved to {1}".format(
+            os.path.basename(path), moved))
+
+    def on_check(self, evt=None):
+        """Read every page of the diary; say so only if something is wrong.
+        """
+        self.engine.tools.busy(self.winfo_toplevel())
+        try:
+            result = self.engine.db.check()
+        finally:
+            self.engine.tools.not_busy(self.winfo_toplevel())
+        if result == "ok":
+            self.set_status("The diary is sound: every page read, no fault.")
+        else:
+            messagebox.showerror(APP_NAME,
+                                 "The diary is damaged:\n\n{0}\n\nRestore a"
+                                 " backup.".format(result),
+                                 parent=self.winfo_toplevel())
+
+    def on_vacuum(self, evt=None):
+        self.engine.tools.busy(self.winfo_toplevel())
+        try:
+            saved = self.engine.db.vacuum()
+        finally:
+            self.engine.tools.not_busy(self.winfo_toplevel())
+        self.set_status("Vacuum done: {0} bytes saved.".format(saved))
+
     def on_fresh_diary(self, evt=None):
         """Put the diary aside and start an empty one, once asked.
 
@@ -175,14 +238,22 @@ class Main(ttk.Frame):
             self.set_fresh_diary()
 
     def set_fresh_diary(self):
-        # The form open belongs to a reading of the diary that is going.
+        self.set_forms_closed()
+        path = self.engine.set_fresh_diary()
+        self.set_diary_replaced()
+        self.set_status("New diary. The old one is {0}".format(path))
+
+    def set_forms_closed(self):
+        """The form open belongs to a reading of the diary that is going."""
         form = self.engine.windows.get("reading")
         if form is not None:
             form.on_cancel()
-        path = self.engine.set_fresh_diary()
+
+    def set_diary_replaced(self):
+        """Everything on screen is read again from the new file."""
         self.engine.events.notify("settings", None)
         self.engine.events.notify("readings", None)
-        self.set_status("New diary. The old one is {0}".format(path))
+        self.readings.set_first()
 
     # --- events --------------------------------------------------------------
 

@@ -18,7 +18,9 @@ session row its triggers read) and its date converters: every date here is
 ISO text in a TEXT column, and nothing has to be converted on the way.
 """
 
+import os
 import sqlite3
+import urllib.request
 
 
 class DBMS:
@@ -139,6 +141,49 @@ class DBMS:
             self.con.backup(target)
         finally:
             target.close()
+
+    def check(self):
+        """Ask SQLite whether the file is sound, page by page.
+
+        PRAGMA integrity_check reads the whole database and answers "ok",
+        or a list of what is wrong. Corruption is silent until something
+        reads the damaged page; this reads them all.
+        """
+        rows = self.read(True, "PRAGMA integrity_check")
+        return "\n".join(row[0] for row in rows)
+
+    def vacuum(self):
+        """Rebuild the file without the space freed pages left behind.
+
+        SQLite does not give pages back when rows go: it keeps them for the
+        next insert. VACUUM writes the file again from scratch, in order. It
+        cannot run inside a transaction, so the connection is committed and
+        put in autocommit for the duration. Returns the bytes saved.
+        """
+        before = os.path.getsize(self.database)
+        self.con.commit()
+        level = self.con.isolation_level
+        self.con.isolation_level = None
+        try:
+            self.con.execute("VACUUM")
+        finally:
+            self.con.isolation_level = level
+        return before - os.path.getsize(self.database)
+
+    def get_file_state(self, path):
+        """Schema version and integrity of another database file.
+
+        Opened read only, through a URI, so that asking about a file can
+        never change it - nor create it, if the path is wrong.
+        """
+        uri = "file:{0}?mode=ro".format(urllib.request.pathname2url(path))
+        con = sqlite3.connect(uri, uri=True)
+        try:
+            version = con.execute("PRAGMA user_version").fetchone()[0]
+            rows = con.execute("PRAGMA integrity_check").fetchall()
+        finally:
+            con.close()
+        return (version, "\n".join(row[0] for row in rows))
 
     def write_script(self, script):
         """Run a whole .sql file: the schema and the master data.

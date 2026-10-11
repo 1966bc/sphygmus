@@ -129,6 +129,23 @@ class AppTestCase(WindowTestCase):
             app.destroy()
             shutil.rmtree(folder)
 
+    def get_labels(self, menu):
+        labels = []
+        for index in range(menu.index("end") + 1):
+            if menu.type(index) == "command":
+                labels.append(menu.entrycget(index, "label"))
+        return labels
+
+    def test_file_menu_holds_the_diary_as_a_file(self):
+        self.assertEqual(self.get_labels(self.main.mnu_file),
+                         ["Back up the diary", "Restore a backup...",
+                          "Check the diary", "Vacuum the diary",
+                          "Start a new diary...", "Exit"])
+
+    def test_check_says_sound_on_the_status_bar(self):
+        self.main.on_check()
+        self.assertIn("sound", self.main.status.get())
+
     def test_unknown_theme_is_refused(self):
         with self.assertRaises(ValueError):
             App(database=":memory:", log=Log(os.devnull), theme="nothing")
