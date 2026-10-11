@@ -27,6 +27,11 @@ to take to the doctor.
 
 ![The plot: each reading a line from diastolic to systolic, filled when seated, hollow when lying down](docs/images/chart.png)
 
+The report to take to the doctor, first page; it prints in black and white
+without losing anything:
+
+![The first page of the PDF report](docs/images/report.png)
+
 It records and shows. It does not diagnose or advise.
 
 ## Why it is written the way it is
