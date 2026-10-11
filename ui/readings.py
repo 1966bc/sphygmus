@@ -9,9 +9,14 @@
 A reading at or over the threshold is shown in the emphasis colour (R4):
 computed here, as the row is drawn, and stored nowhere.
 
+Removed readings - enable 0 (R6) - are shown on request, in grey: shown is
+"active", "removed" or "all", and the main window offers the choice. The
+chart, the statistics and the report only ever count the active ones.
+
 Gestures, because they are done to something already on screen: a double
-click or Enter opens a reading in its form, to be corrected; Delete takes
-it out of the diary. After a save the list lands on the row saved.
+click or Enter opens a reading in its form; Delete takes an active reading
+out of the diary, and brings a removed one back. After a save the list
+lands on the row saved.
 """
 
 import tkinter as tk
@@ -33,6 +38,10 @@ class ReadingList(ttk.Frame):
         self.get_period = get_period
         self.on_pick = on_pick
         self.count = tk.StringVar()
+        # Which readings: "active", "removed" or "all".
+        self.shown = tk.StringVar(value="active")
+        # reading_id -> enable, for the rows on show.
+        self.enabled = {}
 
         self.init_ui()
 
@@ -61,22 +70,28 @@ class ReadingList(ttk.Frame):
         ttk.Label(self, textvariable=self.count,
                   style="App.TLabel").pack(side=tk.TOP, anchor=tk.W)
 
+    def get_tags(self, row, threshold):
+        """Grey when removed; the emphasis colour when over; or nothing."""
+        tags = self.engine.tools.get_enable_tags(row["enable"])
+        if row["enable"] and threshold.is_over(row["systolic_mmhg"],
+                                               row["diastolic_mmhg"]):
+            tags = ("over",)
+        return tags
+
     def set_rows(self, selected_id=None):
         """Fill the list with the period's readings; land on selected_id."""
         self.engine.tools.clear_treeview(self.tree)
+        self.enabled = {}
         period = self.get_period()
         rows = []
         if period is not None:
-            rows = self.engine.get_readings(*period)
+            rows = self.engine.get_readings(*period,
+                                            shown=self.shown.get())
         threshold = self.engine.get_threshold()
-        over = 0
         for row in rows:
-            tags = ()
-            if threshold.is_over(row["systolic_mmhg"],
-                                 row["diastolic_mmhg"]):
-                tags = ("over",)
-                over += 1
+            tags = self.get_tags(row, threshold)
             moment = self.engine.get_moment(row["recorded_at"])
+            self.enabled[row["reading_id"]] = row["enable"]
             self.tree.insert("", tk.END, iid=str(row["reading_id"]),
                              tags=tags,
                              values=(self.engine.get_shown_day(moment),
@@ -85,10 +100,21 @@ class ReadingList(ttk.Frame):
                                      row["systolic_mmhg"],
                                      row["diastolic_mmhg"],
                                      row["heart_rate_bpm"]))
-        self.count.set("{0} readings, {1} at or over {2}".format(
-            len(rows), over, threshold.get_caption()))
+        self.set_count(rows, threshold)
         if selected_id is not None and self.tree.exists(str(selected_id)):
             self.engine.tools.set_selected(self.tree, str(selected_id))
+
+    def set_count(self, rows, threshold):
+        active = [row for row in rows if row["enable"]]
+        over = [row for row in active
+                if threshold.is_over(row["systolic_mmhg"],
+                                     row["diastolic_mmhg"])]
+        text = "{0} readings, {1} at or over {2}".format(
+            len(active), len(over), threshold.get_caption())
+        removed = len(rows) - len(active)
+        if removed:
+            text = "{0}; {1} removed, in grey".format(text, removed)
+        self.count.set(text)
 
     def set_first(self):
         """The keyboard on the list, on the first row if there is one."""
@@ -106,8 +132,14 @@ class ReadingList(ttk.Frame):
             reading_id = int(iid)
         return reading_id
 
+    def is_removed(self, reading_id):
+        return self.enabled.get(reading_id) == 0
+
     def on_changed(self, row_id=None):
         self.set_rows(row_id)
+
+    def on_shown(self):
+        self.set_rows(self.get_selected_id())
 
     def on_double_click(self, evt=None):
         reading_id = self.get_selected_id()
@@ -115,23 +147,47 @@ class ReadingList(ttk.Frame):
             self.on_pick(reading_id)
 
     def on_delete(self, evt=None):
-        """Take a reading out of the diary, once asked (R6).
-
-        It stays in the file and in the trail; it leaves the list, the
-        chart, the statistics and the report. A question, because nothing
-        on screen brings it back.
-        """
+        """Remove an active reading, or bring a removed one back; asked."""
         reading_id = self.get_selected_id()
         if reading_id is not None:
             values = self.tree.item(str(reading_id), "values")
-            question = ("Remove the reading of {0} {1}, {2}/{3}?\n\nIt"
-                        " leaves the diary, the chart and the report.".format(
-                            values[0], values[1], values[3], values[4]))
-            if messagebox.askyesno(APP_NAME, question,
-                                   default=messagebox.NO,
-                                   parent=self.winfo_toplevel()):
-                self.engine.disable_reading(reading_id)
-                self.engine.events.notify("readings", None)
+            caption = "{0} {1}, {2}/{3}".format(values[0], values[1],
+                                                values[3], values[4])
+            if self.is_removed(reading_id):
+                self.set_restored(reading_id, caption)
+            else:
+                self.set_removed(reading_id, caption)
+
+    def set_removed(self, reading_id, caption):
+        """Take a reading out of the diary (R6).
+
+        It stays in the file and in the trail, and the list shows it in
+        grey under Removed; it leaves the chart, the statistics and the
+        report.
+        """
+        question = ("Remove the reading of {0}?\n\nIt leaves the diary, the"
+                    " chart and the report. Removed, it is still shown in"
+                    " grey, and can be brought back.".format(caption))
+        if messagebox.askyesno(APP_NAME, question, default=messagebox.NO,
+                               parent=self.winfo_toplevel()):
+            self.engine.disable_reading(reading_id)
+            self.engine.events.notify("readings", reading_id)
+
+    def set_restored(self, reading_id, caption):
+        """Bring a removed reading back, if its second is still free."""
+        parent = self.winfo_toplevel()
+        if not self.engine.can_enable(reading_id):
+            messagebox.showinfo(APP_NAME,
+                                "The reading of {0} cannot come back: another"
+                                " reading holds that second, most likely the"
+                                " one that corrected it.".format(caption),
+                                parent=parent)
+        elif messagebox.askyesno(APP_NAME,
+                                 "Bring the reading of {0} back into the"
+                                 " diary?".format(caption),
+                                 default=messagebox.NO, parent=parent):
+            self.engine.enable_reading(reading_id)
+            self.engine.events.notify("readings", reading_id)
 
     def on_destroy(self, evt=None):
         if evt is None or evt.widget is self:

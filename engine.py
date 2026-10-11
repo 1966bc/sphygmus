@@ -49,6 +49,9 @@ MIGRATIONS = {2: os.path.join("sql", "ddl", "002_period_setting.sql")}
 # diary wherever sphygmus.ini puts it.
 BACKUP_DIR = "backup"
 
+# Which readings a list shows, as the lowest and highest enable (R6).
+SHOWN = {"active": (1, 1), "removed": (0, 0), "all": (0, 1)}
+
 # How a moment is written in the diary (R2), and how a day is shown.
 STORED = "%Y-%m-%d %H:%M:%S"
 SHOWN_DAY = "%d/%m/%Y"
@@ -331,10 +334,15 @@ class Engine:
             position_id = row["position_id"]
         return position_id
 
-    def get_readings(self, start, end):
-        """The enabled readings of a period of days, the latest first."""
-        return self.db.read(True, self.get_query("readings"),
-                            self.get_bounds(start, end))
+    def get_readings(self, start, end, shown="active"):
+        """The readings of a period of days, the latest first.
+
+        shown is "active", the readings in the diary, which is all the
+        chart, the statistics and the report ever ask for; "removed", those
+        taken out of it; or "all".
+        """
+        args = self.get_bounds(start, end) + SHOWN[shown]
+        return self.db.read(True, self.get_query("readings"), args)
 
     def get_statistics(self, start, end):
         """Count, mean, minimum and maximum per position, for a period."""
@@ -390,4 +398,17 @@ class Engine:
     def disable_reading(self, reading_id):
         """Take a reading out of the diary. It stays in the file (R6)."""
         sql = "UPDATE readings SET enable = 0 WHERE reading_id = ?"
+        return self.db.write(sql, (reading_id,))
+
+    def can_enable(self, reading_id):
+        """Whether a removed reading can come back: its second is free.
+
+        A corrected reading cannot: its second belongs to the correction.
+        """
+        row = self.get_reading(reading_id)
+        return not self.is_taken(row["recorded_at"], reading_id)
+
+    def enable_reading(self, reading_id):
+        """Bring a removed reading back into the diary."""
+        sql = "UPDATE readings SET enable = 1 WHERE reading_id = ?"
         return self.db.write(sql, (reading_id,))

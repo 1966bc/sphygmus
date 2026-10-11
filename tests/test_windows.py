@@ -458,6 +458,92 @@ class ChartTestCase(WindowTestCase):
 
 class ListTestCase(WindowTestCase):
 
+    def show(self, shown):
+        self.main.readings.shown.set(shown)
+        self.main.readings.on_shown()
+
+    def test_removed_reading_is_grey_under_removed(self):
+        reading_id = self.add(self.get_today_at(0, 1), 140, 79)
+        self.engine.disable_reading(reading_id)
+        self.show("removed")
+        self.assertEqual(self.tree.item(str(reading_id), "tags"),
+                         ("discarded",))
+
+    def test_all_shows_both_and_counts_only_the_active(self):
+        kept = self.add(self.get_today_at(0, 1), 128, 79)
+        gone = self.add(self.get_today_at(0, 2), 129, 79)
+        self.engine.disable_reading(gone)
+        self.show("all")
+        self.assertEqual(set(self.tree.get_children()),
+                         {str(kept), str(gone)})
+        self.assertTrue(self.main.readings.count.get().startswith(
+            "1 readings"))
+        self.assertIn("1 removed", self.main.readings.count.get())
+
+    def test_active_hides_the_removed(self):
+        gone = self.add(self.get_today_at(0, 2), 129, 79)
+        self.engine.disable_reading(gone)
+        self.show("active")
+        self.assertEqual(self.tree.get_children(), ())
+
+    def test_removed_reading_opens_unticked(self):
+        gone = self.add(self.get_today_at(0, 2), 129, 79)
+        self.engine.disable_reading(gone)
+        self.show("removed")
+        self.main.on_edit(gone)
+        form = self.get_form()
+        self.assertFalse(form.enable.get())
+        self.assertTrue(form.title().endswith("- removed"))
+
+    def test_ticking_brings_a_removed_reading_back(self):
+        gone = self.add(self.get_today_at(0, 2), 129, 79)
+        self.engine.disable_reading(gone)
+        self.main.on_edit(gone)
+        form = self.get_form()
+        form.enable.set(True)
+        form.on_save()
+        self.app.update()
+        self.assertEqual(self.engine.get_reading(gone)["enable"], 1)
+        self.assertEqual(self.tree.focus(), str(gone))
+
+    def test_unticking_takes_a_reading_out(self):
+        reading_id = self.add(self.get_today_at(0, 2), 129, 79)
+        self.main.on_edit(reading_id)
+        form = self.get_form()
+        form.enable.set(False)
+        form.on_save()
+        self.assertEqual(self.engine.get_reading(reading_id)["enable"], 0)
+
+    def test_corrected_reading_cannot_be_ticked_back(self):
+        old_id = self.add(self.get_today_at(0, 3), 210, 79)
+        self.main.on_edit(old_id)
+        form = self.get_form()
+        form.systolic.set("120")
+        form.on_save()
+        self.main.on_edit(old_id)
+        form = self.get_form()
+        form.enable.set(True)
+        self.assertIn("already a reading", form.get_problem())
+
+    def test_new_reading_cannot_be_unticked(self):
+        form = self.open_new()
+        self.assertTrue(form.chk_enable.instate(("disabled",)))
+
+    def test_removed_reading_can_come_back(self):
+        gone = self.add(self.get_today_at(0, 2), 129, 79)
+        self.engine.disable_reading(gone)
+        self.assertTrue(self.engine.can_enable(gone))
+        self.engine.enable_reading(gone)
+        self.assertEqual(self.engine.get_reading_count(), 1)
+
+    def test_corrected_reading_cannot_come_back(self):
+        old_id = self.add(self.get_today_at(0, 3), 210, 79)
+        values = self.engine.get_reading_values(
+            self.engine.get_stored(self.get_today_at(0, 3)), SEATED, 120, 79,
+            70)
+        self.engine.correct_reading(old_id, values)
+        self.assertFalse(self.engine.can_enable(old_id))
+
     def test_delete_without_a_selection_says_so(self):
         self.main.on_delete()
         self.assertIn("Select a reading", self.main.status.get())

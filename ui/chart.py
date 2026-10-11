@@ -24,7 +24,7 @@ from version import APP_NAME
 
 
 class Chart(tk.Toplevel):
-    """A canvas, and Close."""
+    """A canvas, the whole window."""
 
     def __init__(self, parent, get_period):
         super().__init__(parent, name="chart")
@@ -41,12 +41,11 @@ class Chart(tk.Toplevel):
         self.bind("<Destroy>", self.on_destroy, add="+")
 
     def init_ui(self):
+        # No button: the chart is all canvas, closed by the window's X or
+        # by Escape.
         frm_main = ttk.Frame(self, style="App.TFrame", padding=8)
         self.canvas = PressureCanvas(frm_main)
-        buttons = self.engine.tools.get_button_column(
-            frm_main, (("Close", self.on_cancel),), window=self)
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        buttons.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 0))
+        self.canvas.pack(fill=tk.BOTH, expand=1)
         frm_main.pack(fill=tk.BOTH, expand=1)
 
     def on_open(self):

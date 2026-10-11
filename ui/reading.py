@@ -18,10 +18,13 @@ would notice. The form remembers what it last wrote in the two fields:
 when they no longer say that, a person has changed them, and the clock
 lets go.
 
-Saving a reading that is being corrected disables it and stores the new
-one in a single transaction (R6); saving it unchanged writes nothing. Either
-way the form closes and notifies "readings" with the id of the row saved,
-so the list lands on it. Who listens is not the form's business.
+An existing reading opens with "In the diary" ticked or not, as its enable
+says (R6). Unticking it takes the reading out of the diary; ticking a
+removed one brings it back, if its second is still free. Changed values
+are a correction: the reading is disabled and the new one stored in a
+single transaction; unchanged values write nothing. Either way the form
+closes and notifies "readings" with the id of the row saved, so the list
+lands on it. Who listens is not the form's business.
 """
 
 import datetime
@@ -56,6 +59,8 @@ class Reading(tk.Toplevel):
         self.heart_rate = tk.StringVar()
         self.position_id = tk.IntVar()
         self.time = tk.StringVar()
+        # Ticked: the reading is in the diary, enable 1 (R6).
+        self.enable = tk.BooleanVar(value=True)
 
         # What the form last wrote in date and time, to tell a person's
         # change from its own.
@@ -98,6 +103,12 @@ class Reading(tk.Toplevel):
                                   width=9, justify=tk.CENTER)
         self.add_field(5, "Time", self.ent_time)
 
+        self.chk_enable = ttk.Checkbutton(self.frm_fields,
+                                          text="In the diary",
+                                          variable=self.enable,
+                                          style="App.TCheckbutton")
+        self.add_field(6, "", self.chk_enable)
+
         buttons = tools.get_button_column(frm_main,
                                           (("Save", self.on_save),
                                            ("Close", self.on_cancel)),
@@ -128,6 +139,9 @@ class Reading(tk.Toplevel):
         """Fill the form and show it; called by the register of windows."""
         if self.reading_id is None:
             self.title("New reading")
+            # A reading is born in the diary: there is no removing what
+            # has not been saved.
+            self.chk_enable.state(("disabled",))
             self.position_id.set(self.engine.get_last_position_id())
             self.set_now()
             self.tick = self.after(TICK_MS, self.on_tick)
@@ -139,8 +153,11 @@ class Reading(tk.Toplevel):
 
     def set_values(self, row):
         moment = self.engine.get_moment(row["recorded_at"])
-        self.title("Reading of {0}".format(
-            self.engine.get_shown_moment(moment)))
+        title = "Reading of {0}".format(self.engine.get_shown_moment(moment))
+        if not row["enable"]:
+            title = "{0} - removed".format(title)
+        self.title(title)
+        self.enable.set(bool(row["enable"]))
         self.systolic.set(str(row["systolic_mmhg"]))
         self.diastolic.set(str(row["diastolic_mmhg"]))
         self.heart_rate.set(str(row["heart_rate_bpm"]))
@@ -219,11 +236,17 @@ class Reading(tk.Toplevel):
         return numbers
 
     def get_problem(self):
-        """What is wrong with the form, in words, or None."""
+        """What is wrong with the form, in words, or None.
+
+        Nothing is asked of a reading being taken out of the diary: what it
+        says no longer counts.
+        """
         moment = self.get_moment()
         numbers = self.get_numbers()
         problem = None
-        if numbers is None:
+        if not self.enable.get():
+            problem = None
+        elif numbers is None:
             problem = "Type systolic, diastolic and heart rate, all three."
         elif min(numbers) <= 0:
             problem = "A reading of zero is not a reading."
@@ -236,8 +259,8 @@ class Reading(tk.Toplevel):
             problem = "That moment has not come yet."
         elif self.engine.is_taken(self.engine.get_stored(moment),
                                   self.reading_id):
-            problem = ("There is already a reading at that second."
-                       " Correct it from the list instead.")
+            problem = ("There is already a reading at that second: if this"
+                       " one was corrected, the correction holds it.")
         return problem
 
     def get_values(self):
@@ -247,10 +270,14 @@ class Reading(tk.Toplevel):
             self.engine.get_stored(self.get_moment()),
             self.position_id.get(), systolic, diastolic, heart_rate)
 
-    def is_unchanged(self, values):
-        """Whether a correction would store what is already there."""
-        row = self.engine.get_reading(self.reading_id)
-        return all(row[name] == value for name, value in values.items())
+    def is_unchanged(self, row, values):
+        """Whether the form says what the reading already says.
+
+        enable is left out: whether it is in the diary is the check box's
+        question, asked apart.
+        """
+        return all(row[name] == value for name, value in values.items()
+                   if name != "enable")
 
     # --- saving and closing --------------------------------------------------
 
@@ -264,18 +291,37 @@ class Reading(tk.Toplevel):
         return "break"
 
     def set_saved(self):
-        values = self.get_values()
         if self.reading_id is None:
-            saved_id = self.engine.add_reading(values)
-        elif self.is_unchanged(values):
-            saved_id = self.reading_id
+            saved_id = self.engine.add_reading(self.get_values())
         else:
-            saved_id = self.engine.correct_reading(self.reading_id, values)
-        self.engine.log.trace("saved {0}: {1}".format(saved_id, values))
+            saved_id = self.get_saved_id()
+        self.engine.log.trace("saved {0}".format(saved_id))
         # Closed first: notify is synchronous, and the list it reaches
         # takes the focus.
         self.on_cancel()
         self.engine.events.notify("readings", saved_id)
+
+    def get_saved_id(self):
+        """Write what the form says about an existing reading; its id.
+
+        In the diary or not is the check box; the values are the fields.
+        A change of values is a correction (R6): the reading is disabled,
+        if it was not already, and a new one stored - which is also how a
+        removed reading comes back corrected.
+        """
+        row = self.engine.get_reading(self.reading_id)
+        saved_id = self.reading_id
+        if not self.enable.get():
+            if row["enable"]:
+                self.engine.disable_reading(self.reading_id)
+        else:
+            values = self.get_values()
+            if not self.is_unchanged(row, values):
+                saved_id = self.engine.correct_reading(self.reading_id,
+                                                       values)
+            elif not row["enable"]:
+                self.engine.enable_reading(self.reading_id)
+        return saved_id
 
     def on_cancel(self, evt=None):
         self.destroy()

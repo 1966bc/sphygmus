@@ -134,6 +134,15 @@ class Main(ttk.Frame):
                        ("Delete", self.on_delete),
                        ("Chart", self.on_chart),
                        ("Close", root.on_exit)), window=root)
+        frm_shown = ttk.LabelFrame(buttons, text="Show",
+                                   style="App.TLabelframe", padding=4)
+        for caption, value in (("Active", "active"), ("Removed", "removed"),
+                               ("All", "all")):
+            ttk.Radiobutton(frm_shown, text=caption, value=value,
+                            variable=self.readings.shown,
+                            command=self.readings.on_shown,
+                            style="App.TRadiobutton").pack(anchor=tk.W)
+        frm_shown.pack(fill=tk.X, padx=5, pady=(12, 5))
         buttons.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 0))
         frm_list.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
