@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from engine import Engine
+from ui.icon import ICONS
 from ui.main import Main
 from version import APP_NAME
 
@@ -35,6 +36,7 @@ class App(tk.Tk):
         self.engine = Engine(database, log)
 
         self.title(APP_NAME)
+        self.set_icon()
         self.protocol("WM_DELETE_WINDOW", self.on_exit)
         self.engine.tools.set_style(theme)
 
@@ -47,6 +49,18 @@ class App(tk.Tk):
         # Where the day starts: the first number of a reading.
         self.main.entry.ent_systolic.focus_set()
         self.engine.log.trace("ready")
+
+    def set_icon(self):
+        """The icon, in every size the window manager may ask for.
+
+        The images are kept on the instance: Tk holds them by name, and a
+        PhotoImage nobody keeps is collected, leaving an empty icon.
+        True: every window opened later carries it too. master=self, or
+        the image belongs to whichever Tk was created first in the process.
+        """
+        self.icons = [tk.PhotoImage(master=self, data=data)
+                      for data in ICONS]
+        self.iconphoto(True, *self.icons)
 
     def report_callback_exception(self, exc, val, tb):
         """Tkinter calls this for an exception raised in a callback.

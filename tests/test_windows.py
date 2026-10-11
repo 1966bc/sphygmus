@@ -78,6 +78,10 @@ class AppTestCase(WindowTestCase):
     def test_opens_with_the_keyboard_on_systolic(self):
         self.assertIs(self.app.focus_get(), self.entry.ent_systolic)
 
+    def test_icon_comes_in_every_size(self):
+        sizes = [icon.width() for icon in self.app.icons]
+        self.assertEqual(sizes, [16, 32, 48, 64, 128])
+
     def test_title_is_the_name(self):
         self.assertEqual(self.app.title(), "Sphygmus")
 
