@@ -100,6 +100,34 @@ class DBMS:
 
         return written
 
+    def write_all(self, statements):
+        """Run several statements as one: all of them, or none.
+
+        statements is a sequence of (sql, args). A correction is two
+        statements, a disable and an insert, and half of it would leave the
+        diary with no reading or with two. Returns what write() would have
+        returned for the last one.
+        """
+        if not statements:
+            raise ValueError("a transaction with no statement in it")
+        cur = self.con.cursor()
+        try:
+            for sql, args in statements:
+                cur.execute(sql, args)
+            if sql.lstrip()[:6].upper() == "INSERT":
+                written = cur.lastrowid
+            else:
+                written = cur.rowcount
+            self.con.commit()
+        except sqlite3.Error:
+            self.con.rollback()
+            self.log.error("transaction failed, rolled back: {0}".format(sql))
+            raise
+        finally:
+            cur.close()
+
+        return written
+
     def write_script(self, script):
         """Run a whole .sql file: the schema and the master data.
 
