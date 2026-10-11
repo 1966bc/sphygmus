@@ -7,8 +7,6 @@ From the Greek *sphygmós*, the pulse: the root of *sphygmomanometer*.
 A home blood pressure diary: Python, Tkinter and SQLite, with a PDF report
 to take to the doctor.
 
-![The main window, on the invented readings of the demo diary](docs/images/main.png)
-
 ## What it does
 
 - Records each reading as the device shows it: date and time, systolic,
