@@ -18,8 +18,8 @@ would notice. The form remembers what it last wrote in the two fields:
 when they no longer say that, a person has changed them, and the clock
 lets go.
 
-An existing reading opens with "In the diary" ticked or not, as its enable
-says (R6). Unticking it takes the reading out of the diary; ticking a
+An existing reading opens with Enable ticked or not, as its column says
+(R6). Unticking it takes the reading out of the diary; ticking a
 removed one brings it back, if its second is still free. Changed values
 are a correction: the reading is disabled and the new one stored in a
 single transaction; unchanged values write nothing. Either way the form
@@ -104,10 +104,9 @@ class Reading(tk.Toplevel):
         self.add_field(5, "Time", self.ent_time)
 
         self.chk_enable = ttk.Checkbutton(self.frm_fields,
-                                          text="In the diary",
                                           variable=self.enable,
                                           style="App.TCheckbutton")
-        self.add_field(6, "", self.chk_enable)
+        self.add_field(6, "Enable", self.chk_enable)
 
         buttons = tools.get_button_column(frm_main,
                                           (("Save", self.on_save),
@@ -304,7 +303,7 @@ class Reading(tk.Toplevel):
     def get_saved_id(self):
         """Write what the form says about an existing reading; its id.
 
-        In the diary or not is the check box; the values are the fields.
+        Enable is the check box; the values are the fields.
         A change of values is a correction (R6): the reading is disabled,
         if it was not already, and a new one stored - which is also how a
         removed reading comes back corrected.
