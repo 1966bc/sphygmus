@@ -35,7 +35,8 @@ try:
                                            String)
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer,
                                     Table, TableStyle)
@@ -99,7 +100,12 @@ class Report:
 
     def get_heading(self, styles, period, threshold):
         name = self.engine.get_setting("patient_name")
-        lines = [Paragraph("Home blood pressure diary", styles["Title"])]
+        # The program's name first: whoever reads the paper knows what
+        # wrote it before reading what it says.
+        subtitle = ParagraphStyle("Subtitle", parent=styles["Heading2"],
+                                  alignment=TA_CENTER, spaceBefore=0)
+        lines = [Paragraph(APP_NAME, styles["Title"]),
+                 Paragraph("Home blood pressure diary", subtitle)]
         facts = "From {0} to {1}. Printed {2}.".format(
             self.engine.get_shown_day(period[0]),
             self.engine.get_shown_day(period[1]),
