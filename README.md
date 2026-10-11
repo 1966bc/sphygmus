@@ -5,7 +5,8 @@ From the Greek *sphygmós*, the pulse: the root of *sphygmomanometer*.
 A home blood pressure diary: Python, Tkinter and SQLite, with a PDF report
 to take to the doctor.
 
-> **Status:** design. The schema is written; the program is not yet.
+> **Status:** under construction. The schema and the skeleton of the
+> program are written; the windows that use them are not yet.
 
 ## What it does
 
