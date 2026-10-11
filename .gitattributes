@@ -1,0 +1,9 @@
+# Normalise line endings in the repository to LF regardless of the machine the
+# work is done on, or the first checkout on the other platform rewrites every
+# file and buries the real changes in noise.
+* text=auto eol=lf
+
+# Binary, never touched.
+*.png binary
+*.sl3 binary
+*.pdf binary
