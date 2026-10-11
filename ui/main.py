@@ -17,12 +17,16 @@ period through a function handed to it; the list asks for a reading to be
 opened through another.
 """
 
+import datetime
 import os
+import subprocess
+import tempfile
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 
+from report import HAS_REPORTLAB, Report
 from ui.calendarium import DATE_CHANGED, Calendarium
 from ui.chart import Chart
 from ui.reading import Reading
@@ -80,19 +84,17 @@ class Main(ttk.Frame):
         files.add_checkbutton(label="Demo diary", underline=1,
                               variable=self.demo, command=self.on_demo)
         files.add_separator()
+        files.add_command(label="Report...", underline=0,
+                          command=self.on_report)
+        files.add_separator()
         files.add_command(label="Settings...", underline=0,
                           command=self.on_settings_window)
         files.add_separator()
         files.add_command(label="Exit", underline=1, command=root.on_exit)
         menubar.add_cascade(label="File", underline=0, menu=files)
 
-        # The diary as readings.
-        diary = tk.Menu(menubar, tearoff=0)
-        diary.add_command(label="New reading", underline=0,
-                          command=self.on_new)
-        diary.add_command(label="Chart", underline=0,
-                          command=self.on_chart)
-        menubar.add_cascade(label="Diary", underline=0, menu=diary)
+        # The readings themselves have the buttons beside the list: New,
+        # Edit, Delete, Chart. The menu holds what is done now and then.
 
         helper = tk.Menu(menubar, tearoff=0)
         helper.add_command(label="About", underline=0, command=self.on_about)
@@ -101,7 +103,6 @@ class Main(ttk.Frame):
         root.configure(menu=menubar)
         self.mnu_file = files
         self.mnu_database = database
-        self.mnu_diary = diary
         self.mnu_help = helper
 
     def init_ui(self):
@@ -319,6 +320,51 @@ class Main(ttk.Frame):
             self.set_status("Select a reading in the list first.")
         else:
             self.readings.on_delete()
+
+    def on_report(self, evt=None):
+        """The period's report, as a print preview.
+
+        Written to a temporary file and opened in the system's PDF viewer,
+        which is the preview: print from there, or save it where wanted.
+        A new name each time, so a viewer still holding the last one is
+        never written under.
+        """
+        period = self.get_period()
+        if not HAS_REPORTLAB:
+            messagebox.showinfo(APP_NAME,
+                                "The report needs ReportLab, which is not"
+                                " installed here. On Debian: sudo apt install"
+                                " python3-reportlab",
+                                parent=self.winfo_toplevel())
+        elif period is None:
+            self.set_status("No period: the two dates do not make one.")
+        else:
+            name = "sphygmus_report_{0}.pdf".format(
+                datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+            self.set_report(os.path.join(tempfile.gettempdir(), name),
+                            period)
+
+    def set_report(self, path, period):
+        self.engine.tools.busy(self.winfo_toplevel())
+        try:
+            Report(self.engine).write(path, period)
+        finally:
+            self.engine.tools.not_busy(self.winfo_toplevel())
+        self.set_status("Report opened for printing: {0}".format(path))
+        self.set_opened(path)
+
+    def set_opened(self, path):
+        """Open a file with whatever the system opens it with.
+
+        os.startfile exists on Windows only; elsewhere xdg-open, not waited
+        for: the viewer lives its own life.
+        """
+        if hasattr(os, "startfile"):
+            os.startfile(path)
+        else:
+            subprocess.Popen(["xdg-open", path],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
 
     def on_chart(self, evt=None):
         self.engine.windows.show(

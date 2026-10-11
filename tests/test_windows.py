@@ -141,13 +141,23 @@ class AppTestCase(WindowTestCase):
                          ["Back up", "Restore a backup...", "Check",
                           "Vacuum", "Start a new diary..."])
 
-    def test_file_menu_has_database_demo_settings_exit(self):
+    def test_file_menu_is_the_only_menu_but_help(self):
         menu = self.main.mnu_file
         labels = [menu.entrycget(index, "label")
                   for index in range(menu.index("end") + 1)
                   if menu.type(index) != "separator"]
-        self.assertEqual(labels, ["Database", "Demo diary", "Settings...",
-                                  "Exit"])
+        self.assertEqual(labels, ["Database", "Demo diary", "Report...",
+                                  "Settings...", "Exit"])
+
+    def test_report_is_written_and_opened(self):
+        opened = []
+        self.main.set_opened = opened.append
+        self.add(self.get_today_at(0, 1), 128, 79)
+        self.main.on_report()
+        self.assertEqual(len(opened), 1)
+        self.assertTrue(opened[0].endswith(".pdf"))
+        self.assertTrue(os.path.getsize(opened[0]) > 0)
+        os.remove(opened[0])
 
     def test_check_says_sound_on_the_status_bar(self):
         self.main.on_check()
