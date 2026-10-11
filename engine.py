@@ -6,8 +6,9 @@
 # -----------------------------------------------------------------------------
 """The engine: it owns the parts, and knows no window.
 
-Composition: the engine *has* a log, a database, the widget tools and the
-events, as attributes, so a call says who does the work:
+Composition: the engine *has* a log, a database, the widget tools, the
+events and the register of open windows, as attributes, so a call says who
+does the work:
 self.engine.db.read(...), self.engine.events.notify(...). It inherits from
 nothing.
 
@@ -28,6 +29,7 @@ from events import Events
 from pressure.threshold import Threshold
 from tools import Tools
 from version import SCHEMA_VERSION
+from windows import Windows
 
 # The folder of this file: the .sql files that build a new diary are here.
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -48,6 +50,7 @@ class Engine:
         self.log = log
         self.tools = Tools()
         self.events = Events(log)
+        self.windows = Windows(log)
         self.db = DBMS(database, log)
         # name -> the text of sql/dql/<name>.sql, read once.
         self.queries = {}
@@ -146,6 +149,21 @@ class Engine:
         sql = ("SELECT position_id, description FROM positions"
                " WHERE enable = 1 ORDER BY position_id")
         return self.db.read(True, sql)
+
+    def get_last_position_id(self):
+        """The position of the latest reading, or the first position.
+
+        A new reading starts where the last one was taken: whoever measures
+        lying down in the evening is likely to do it again.
+        """
+        sql = ("SELECT position_id FROM readings WHERE enable = 1"
+               " ORDER BY recorded_at DESC LIMIT 1")
+        row = self.db.read(False, sql)
+        if row is None:
+            position_id = self.get_positions()[0]["position_id"]
+        else:
+            position_id = row["position_id"]
+        return position_id
 
     def get_readings(self, start, end):
         """The enabled readings of a period of days, the latest first."""

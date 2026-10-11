@@ -9,9 +9,9 @@
 A reading at or over the threshold is shown in the emphasis colour (R4):
 computed here, as the row is drawn, and stored nowhere.
 
-Two gestures, because they are done to something already on screen: a
-double click puts a reading in the entry strip to be corrected, Delete
-takes it out of the diary. Neither is a button.
+Gestures, because they are done to something already on screen: a double
+click or Enter opens a reading in its form, to be corrected; Delete takes
+it out of the diary. After a save the list lands on the row saved.
 """
 
 import tkinter as tk
@@ -27,9 +27,9 @@ class ReadingList(ttk.Frame):
     def __init__(self, parent, get_period, on_pick):
         super().__init__(parent, style="App.TFrame")
         self.engine = self.nametowidget(".").engine
-        # Handed in by whoever owns the period and the entry strip: the
-        # list asks for the one and hands rows to the other without knowing
-        # either.
+        # Handed in by the main window, which owns the period and opens the
+        # form: the list asks for the one and hands a row to the other
+        # without knowing either.
         self.get_period = get_period
         self.on_pick = on_pick
         self.count = tk.StringVar()
@@ -54,6 +54,8 @@ class ReadingList(ttk.Frame):
         self.tree.tag_configure("over",
                                 foreground=tools.get_rgb(*tools.EMPHASIS))
         self.tree.bind("<Double-1>", self.on_double_click)
+        self.tree.bind("<Return>", self.on_double_click)
+        self.tree.bind("<KP_Enter>", self.on_double_click)
         self.tree.bind("<Delete>", self.on_delete)
         frame.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         ttk.Label(self, textvariable=self.count,
@@ -87,6 +89,14 @@ class ReadingList(ttk.Frame):
             len(rows), over, threshold.get_caption()))
         if selected_id is not None and self.tree.exists(str(selected_id)):
             self.engine.tools.set_selected(self.tree, str(selected_id))
+
+    def set_first(self):
+        """The keyboard on the list, on the first row if there is one."""
+        rows = self.tree.get_children()
+        if rows:
+            self.engine.tools.set_selected(self.tree, rows[0])
+        else:
+            self.tree.focus_set()
 
     def get_selected_id(self):
         """The reading under the focus, or None."""

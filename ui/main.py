@@ -6,23 +6,23 @@
 # -----------------------------------------------------------------------------
 """The main window: the one the diary is kept in.
 
-Composition: it *has* its parts - the entry strip at the top, the period,
-the list and the statistics - and wires them. The parts do not know each
-other. Each subscribes to the events it shows; the period they ask of the
-main window through a function handed to them, and a double click on the
-list reaches the entry strip through another.
+The period at the top; the readings in one list with the buttons stacked on
+its right, New, Edit and Close; the statistics of the period below. A
+reading is typed and corrected in its own form, ui/reading.py, opened from
+here: the plural opens the singular.
 
-What is done every day has a gesture: Enter in the strip, a double click or
-Delete on the list. What is done now and then is in the menu.
+Composition: the window *has* its parts and wires them. The parts do not
+know each other. Each subscribes to the events it shows and asks the
+period through a function handed to it; the list asks for a reading to be
+opened through another.
 """
 
-import datetime
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 
 from ui.calendarium import DATE_CHANGED, Calendarium
-from ui.entry import EntryStrip
+from ui.reading import Reading
 from ui.readings import ReadingList
 from ui.statistics import Statistics
 from version import APP_NAME, __date__, __license__, __version__
@@ -33,7 +33,7 @@ DEFAULT_DAYS = 30
 
 
 class Main(ttk.Frame):
-    """The entry strip, the period, the readings and their statistics."""
+    """The period, the readings and their statistics."""
 
     def __init__(self, parent):
         super().__init__(parent, style="App.TFrame")
@@ -54,6 +54,9 @@ class Main(ttk.Frame):
         menubar = tk.Menu(root, tearoff=0)
 
         diary = tk.Menu(menubar, tearoff=0)
+        diary.add_command(label="New reading", underline=0,
+                          command=self.on_new)
+        diary.add_separator()
         diary.add_command(label="Quit", underline=0, command=root.on_exit)
         menubar.add_cascade(label="Diary", underline=0, menu=diary)
 
@@ -62,39 +65,39 @@ class Main(ttk.Frame):
         menubar.add_cascade(label="Help", underline=0, menu=helper)
 
         root.configure(menu=menubar)
-        self.menubar = menubar
         self.mnu_diary = diary
         self.mnu_help = helper
 
     def init_ui(self):
+        root = self.nametowidget(".")
+
         bar = ttk.Frame(self, style="StatusBar.TFrame")
         ttk.Label(bar, textvariable=self.status,
                   style="StatusBar.TLabel").pack(side=tk.LEFT, padx=4)
         bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.entry = EntryStrip(self)
-        self.entry.pack(side=tk.TOP, fill=tk.X)
-
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(side=tk.TOP,
-                                                       fill=tk.X, pady=4)
-
-        frm_period = ttk.Frame(self, style="App.TFrame", padding=(8, 0))
+        frm_period = ttk.Frame(self, style="App.TFrame", padding=(8, 8, 8, 0))
         self.start = Calendarium(frm_period, "From")
         self.end = Calendarium(frm_period, "To")
         self.start.set_days_ago(DEFAULT_DAYS)
-        self.start.pack(side=tk.LEFT, padx=4)
-        self.end.pack(side=tk.LEFT, padx=4)
+        self.start.pack(side=tk.LEFT, padx=(0, 8))
+        self.end.pack(side=tk.LEFT)
         self.start.bind(DATE_CHANGED, self.on_period)
         self.end.bind(DATE_CHANGED, self.on_period)
         frm_period.pack(side=tk.TOP, fill=tk.X)
 
-        frm_bottom = ttk.Frame(self, style="App.TFrame", padding=(8, 0, 8, 8))
-        self.readings = ReadingList(frm_bottom, self.get_period,
-                                    self.entry.set_correction)
+        self.statistics = Statistics(self, self.get_period)
+        self.statistics.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 8))
+
+        frm_list = ttk.Frame(self, style="App.TFrame", padding=8)
+        self.readings = ReadingList(frm_list, self.get_period, self.on_edit)
         self.readings.pack(side=tk.LEFT, fill=tk.BOTH, expand=1)
-        self.statistics = Statistics(frm_bottom, self.get_period)
-        self.statistics.pack(side=tk.LEFT, anchor=tk.N, padx=(8, 0))
-        frm_bottom.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        buttons = self.engine.tools.get_button_column(
+            frm_list, (("New", self.on_new),
+                       ("Edit", self.on_edit),
+                       ("Close", root.on_exit)), window=root)
+        buttons.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 0))
+        frm_list.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
 
     def get_period(self):
         """The first and last day shown, or None when they do not make one.
@@ -114,16 +117,40 @@ class Main(ttk.Frame):
         self.statistics.set_rows()
         self.set_status()
 
-    def set_status(self):
-        period = self.get_period()
-        if period is None:
-            shown = "no period: the two dates do not make one"
+    def set_status(self, message=None):
+        """The count and the period; or a message, when there is one."""
+        if message is None:
+            period = self.get_period()
+            if period is None:
+                shown = "no period: the two dates do not make one"
+            else:
+                shown = "from {0} to {1}".format(
+                    self.engine.get_shown_day(period[0]),
+                    self.engine.get_shown_day(period[1]))
+            message = "{0} readings in the diary; showing {1}".format(
+                self.engine.get_reading_count(), shown)
+        self.status.set(message)
+
+    # --- the form of a reading -----------------------------------------------
+
+    def open_reading(self, reading_id):
+        """One form at a time: the one open closes, this one opens."""
+        self.engine.windows.replace(
+            "reading", lambda: Reading(self.winfo_toplevel(), reading_id))
+
+    def on_new(self, evt=None):
+        self.open_reading(None)
+
+    def on_edit(self, reading_id=None):
+        """The reading given, or the one selected in the list."""
+        if reading_id is None:
+            reading_id = self.readings.get_selected_id()
+        if reading_id is None:
+            self.set_status("Select a reading in the list first.")
         else:
-            shown = "from {0} to {1}".format(
-                self.engine.get_shown_day(period[0]),
-                self.engine.get_shown_day(period[1]))
-        self.status.set("{0} readings in the diary; showing {1}".format(
-            self.engine.get_reading_count(), shown))
+            self.open_reading(reading_id)
+
+    # --- events --------------------------------------------------------------
 
     def on_period(self, evt=None):
         self.set_parts()

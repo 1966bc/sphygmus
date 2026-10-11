@@ -46,8 +46,9 @@ class App(tk.Tk):
         # The root has no parent, so center_me places it on the screen: in
         # the middle across, a third of the way down.
         self.engine.tools.center_me(self)
-        # Where the day starts: the first number of a reading.
-        self.main.entry.ent_systolic.focus_set()
+        # The keyboard on the list, on its first row: arrows move, Enter
+        # opens, Alt+N starts a new reading.
+        self.main.readings.set_first()
         self.engine.log.trace("ready")
 
     def set_icon(self):

@@ -4,7 +4,7 @@
 # authors:  Giuseppe Costanzi (1966bc)
 # licence:  GPL-3.0-or-later, see LICENSE
 # -----------------------------------------------------------------------------
-"""Tests for the main window and its parts, opened for real.
+"""Tests for the main window, the list and the form, opened for real.
 
 The application on a diary in memory. They need a display and skip
 themselves without one; run under xvfb-run, or a pass says nothing.
@@ -38,7 +38,7 @@ class WindowTestCase(unittest.TestCase):
         self.app.update()
         self.engine = self.app.engine
         self.main = self.app.main
-        self.entry = self.main.entry
+        self.tree = self.main.readings.tree
 
     def tearDown(self):
         if self.app.winfo_exists():
@@ -56,12 +56,20 @@ class WindowTestCase(unittest.TestCase):
         return datetime.datetime.combine(datetime.date.today(),
                                          datetime.time(hour, minute))
 
-    def type_reading(self, systolic, diastolic, rate, time=None):
-        self.entry.systolic.set(systolic)
-        self.entry.diastolic.set(diastolic)
-        self.entry.heart_rate.set(rate)
+    def get_form(self):
+        return self.engine.windows.get("reading")
+
+    def open_new(self):
+        self.main.on_new()
+        self.app.update()
+        return self.get_form()
+
+    def type_reading(self, form, systolic, diastolic, rate, time=None):
+        form.systolic.set(systolic)
+        form.diastolic.set(diastolic)
+        form.heart_rate.set(rate)
         if time is not None:
-            self.entry.time.set(time)
+            form.time.set(time)
 
 
 class AppTestCase(WindowTestCase):
@@ -75,8 +83,8 @@ class AppTestCase(WindowTestCase):
         self.assertAlmostEqual(middle, self.app.winfo_screenwidth() / 2,
                                delta=2)
 
-    def test_opens_with_the_keyboard_on_systolic(self):
-        self.assertIs(self.app.focus_get(), self.entry.ent_systolic)
+    def test_opens_with_the_keyboard_on_the_list(self):
+        self.assertIs(self.app.focus_get(), self.tree)
 
     def test_icon_comes_in_every_size(self):
         sizes = [icon.width() for icon in self.app.icons]
@@ -104,79 +112,137 @@ class AppTestCase(WindowTestCase):
             App(database=":memory:", log=Log(os.devnull), theme="nothing")
 
 
-class EntryTestCase(WindowTestCase):
+class FormTestCase(WindowTestCase):
+
+    def test_new_opens_a_form_on_systolic(self):
+        form = self.open_new()
+        self.assertEqual(form.title(), "New reading")
+        self.assertIs(self.app.focus_get(), form.ent_systolic)
+
+    def test_new_starts_in_the_last_position(self):
+        self.add(self.get_today_at(0, 1), 128, 79, position=LYING)
+        form = self.open_new()
+        self.assertEqual(form.position_id.get(), LYING)
 
     def test_time_follows_the_clock_untouched(self):
-        self.entry.time.set("00:00:00")
-        self.entry.shown_time = "00:00:00"
-        self.entry.on_tick()
-        self.assertNotEqual(self.entry.time.get(), "00:00:00")
+        form = self.open_new()
+        form.time.set("00:00:00")
+        form.shown_time = "00:00:00"
+        form.on_tick()
+        self.assertNotEqual(form.time.get(), "00:00:00")
 
     def test_time_touched_is_left_alone(self):
-        self.entry.time.set("07:30:00")
-        self.entry.on_tick()
-        self.assertEqual(self.entry.time.get(), "07:30:00")
+        form = self.open_new()
+        form.time.set("07:30:00")
+        form.on_tick()
+        self.assertEqual(form.time.get(), "07:30:00")
 
     def test_empty_number_is_a_problem(self):
-        self.type_reading("128", "", "66")
-        self.assertIn("all three", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "128", "", "66")
+        self.assertIn("all three", form.get_problem())
 
     def test_minus_alone_is_a_problem_not_a_crash(self):
-        self.type_reading("-", "79", "66")
-        self.assertIn("all three", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "-", "79", "66")
+        self.assertIn("all three", form.get_problem())
 
     def test_systolic_not_above_diastolic_is_a_problem(self):
-        self.type_reading("79", "128", "66")
-        self.assertIn("higher", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "79", "128", "66")
+        self.assertIn("higher", form.get_problem())
 
     def test_bad_time_is_a_problem(self):
-        self.type_reading("128", "79", "66", "25:00")
-        self.assertIn("not a date and a time", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66", "25:00")
+        self.assertIn("not a date and a time", form.get_problem())
 
     def test_time_without_seconds_is_read(self):
-        self.type_reading("128", "79", "66", "07:30")
-        self.assertEqual(self.entry.get_time(), datetime.time(7, 30))
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66", "07:30")
+        self.assertEqual(form.get_time(), datetime.time(7, 30))
 
     def test_future_is_a_problem(self):
-        self.type_reading("128", "79", "66")
-        self.entry.date.set_date(datetime.date.today()
-                                 + datetime.timedelta(days=1))
-        self.assertIn("not come yet", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66")
+        form.date.set_date(datetime.date.today()
+                           + datetime.timedelta(days=1))
+        self.assertIn("not come yet", form.get_problem())
 
     def test_taken_second_is_a_problem(self):
         self.add(self.get_today_at(0, 1), 128, 79)
-        self.type_reading("130", "80", "66", "00:01:00")
-        self.assertIn("already a reading", self.entry.get_problem())
+        form = self.open_new()
+        self.type_reading(form, "130", "80", "66", "00:01:00")
+        self.assertIn("already a reading", form.get_problem())
 
-    def test_save_stores_and_clears(self):
-        self.type_reading("128", "79", "66", "00:02:00")
-        self.entry.on_save()
-        self.assertEqual(self.engine.get_reading_count(), 1)
-        self.assertEqual(self.entry.systolic.get(), "")
-        self.assertTrue(self.entry.message.get().startswith("Saved"))
+    def test_save_closes_and_lands_on_the_new_row(self):
+        self.add(self.get_today_at(0, 1), 120, 79)
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66", "00:02:00")
+        form.on_save()
+        self.app.update()
+        self.assertIsNone(self.get_form())
+        self.assertEqual(self.engine.get_reading_count(), 2)
+        saved = self.engine.get_readings(datetime.date.today(),
+                                         datetime.date.today())[0]
+        self.assertEqual(self.tree.focus(), str(saved["reading_id"]))
 
-    def test_save_reaches_the_list(self):
-        self.type_reading("128", "79", "66", "00:02:00")
-        self.entry.on_save()
-        self.assertEqual(len(self.main.readings.tree.get_children()), 1)
+    def test_edit_opens_the_selected_reading(self):
+        reading_id = self.add(self.get_today_at(0, 3), 128, 79)
+        self.engine.tools.set_selected(self.tree, str(reading_id))
+        self.main.on_edit()
+        self.app.update()
+        form = self.get_form()
+        self.assertEqual(form.reading_id, reading_id)
+        self.assertEqual(form.systolic.get(), "128")
+        self.assertEqual(form.time.get(), "00:03:00")
 
-    def test_correction_keeps_the_second_and_replaces(self):
+    def test_edit_without_a_selection_says_so(self):
+        self.main.on_edit()
+        self.assertIsNone(self.get_form())
+        self.assertIn("Select a reading", self.main.status.get())
+
+    def test_double_click_on_another_row_moves_the_form(self):
+        first = self.add(self.get_today_at(0, 3), 128, 79)
+        second = self.add(self.get_today_at(0, 4), 131, 82)
+        for reading_id in (first, second):
+            self.tree.focus(str(reading_id))
+            self.main.readings.on_double_click()
+            self.app.update()
+        forms = [child for child in self.app.winfo_children()
+                 if child.winfo_name() == "reading"]
+        self.assertEqual(len(forms), 1)
+        self.assertEqual(self.get_form().reading_id, second)
+
+    def test_correction_replaces_and_lands_on_the_new_row(self):
         old_id = self.add(self.get_today_at(0, 3), 210, 79)
-        self.entry.set_correction(old_id)
-        self.assertEqual(self.entry.time.get(), "00:03:00")
-        self.entry.systolic.set("120")
-        self.entry.on_save()
+        self.main.on_edit(old_id)
+        form = self.get_form()
+        form.systolic.set("120")
+        form.on_save()
+        self.app.update()
         self.assertEqual(self.engine.get_reading(old_id)["enable"], 0)
         self.assertEqual(self.engine.get_reading_count(), 1)
-        self.assertTrue(self.entry.message.get().startswith("Corrected"))
+        self.assertNotEqual(self.tree.focus(), str(old_id))
+        new_id = int(self.tree.focus())
+        self.assertEqual(self.engine.get_reading(new_id)["systolic_mmhg"],
+                         120)
 
-    def test_escape_gives_up_the_correction(self):
-        old_id = self.add(self.get_today_at(0, 3), 210, 79)
-        self.entry.set_correction(old_id)
-        self.entry.on_cancel()
-        self.assertIsNone(self.entry.correcting)
-        self.assertEqual(self.entry.systolic.get(), "")
-        self.assertEqual(self.engine.get_reading(old_id)["enable"], 1)
+    def test_unchanged_correction_writes_nothing(self):
+        reading_id = self.add(self.get_today_at(0, 3), 128, 79)
+        self.main.on_edit(reading_id)
+        self.get_form().on_save()
+        self.app.update()
+        self.assertEqual(self.engine.get_reading(reading_id)["enable"], 1)
+        self.assertEqual(self.tree.focus(), str(reading_id))
+
+    def test_close_writes_nothing(self):
+        form = self.open_new()
+        self.type_reading(form, "128", "79", "66", "00:02:00")
+        form.on_cancel()
+        self.app.update()
+        self.assertIsNone(self.get_form())
+        self.assertEqual(self.engine.get_reading_count(), 0)
 
 
 class ListTestCase(WindowTestCase):
@@ -184,64 +250,56 @@ class ListTestCase(WindowTestCase):
     def test_reading_over_the_threshold_is_marked(self):
         over_id = self.add(self.get_today_at(0, 1), 135, 70)
         under_id = self.add(self.get_today_at(0, 2), 134, 84)
-        tree = self.main.readings.tree
-        self.assertEqual(tree.item(str(over_id), "tags"), ("over",))
-        self.assertEqual(tree.item(str(under_id), "tags"), "")
+        self.assertEqual(self.tree.item(str(over_id), "tags"), ("over",))
+        self.assertEqual(self.tree.item(str(under_id), "tags"), "")
 
     def test_new_threshold_redraws_the_marks(self):
         reading_id = self.add(self.get_today_at(0, 1), 132, 70)
         self.engine.set_settings({"systolic_threshold_mmhg": "130",
                                   "diastolic_threshold_mmhg": "80"})
         self.engine.events.notify("settings", None)
-        tree = self.main.readings.tree
-        self.assertEqual(tree.item(str(reading_id), "tags"), ("over",))
+        self.assertEqual(self.tree.item(str(reading_id), "tags"), ("over",))
 
     def test_date_is_shown_day_first(self):
         reading_id = self.add(self.get_today_at(0, 1), 128, 79)
-        values = self.main.readings.tree.item(str(reading_id), "values")
+        values = self.tree.item(str(reading_id), "values")
         self.assertEqual(values[0],
                          datetime.date.today().strftime("%d/%m/%Y"))
-
-    def test_double_click_fills_the_strip(self):
-        reading_id = self.add(self.get_today_at(0, 1), 128, 79)
-        self.main.readings.tree.focus(str(reading_id))
-        self.main.readings.on_double_click()
-        self.assertEqual(self.entry.correcting, reading_id)
-        self.assertEqual(self.entry.systolic.get(), "128")
 
     def test_disabled_reading_leaves_the_list(self):
         reading_id = self.add(self.get_today_at(0, 1), 128, 79)
         self.engine.disable_reading(reading_id)
         self.engine.events.notify("readings", None)
-        self.assertEqual(self.main.readings.tree.get_children(), ())
+        self.assertEqual(self.tree.get_children(), ())
 
     def test_period_excludes_older_readings(self):
         old = datetime.datetime.now() - datetime.timedelta(days=60)
         self.add(old.replace(microsecond=0), 128, 79)
-        self.assertEqual(self.main.readings.tree.get_children(), ())
+        self.assertEqual(self.tree.get_children(), ())
 
     def test_impossible_period_shows_nothing(self):
         self.add(self.get_today_at(0, 1), 128, 79)
         self.main.start.set_date(datetime.date.today()
                                  + datetime.timedelta(days=1))
         self.main.on_period()
-        self.assertEqual(self.main.readings.tree.get_children(), ())
+        self.assertEqual(self.tree.get_children(), ())
         self.assertIn("no period", self.main.status.get())
 
 
 class StatisticsTestCase(WindowTestCase):
 
-    def test_one_row_per_position(self):
+    def test_one_line_per_position(self):
         self.add(self.get_today_at(0, 1), 120, 80, 60)
         self.add(self.get_today_at(0, 2), 131, 81, 71)
         self.add(self.get_today_at(0, 3), 110, 70, 58, LYING)
-        tree = self.main.statistics.tree
-        seated = tree.item(str(SEATED), "values")
-        self.assertEqual(seated[0], "seated")
-        self.assertEqual(seated[1], "2")
+        seated, lying = self.main.statistics.lines
         # 125.5 rounds up, as a person rounds.
-        self.assertEqual(seated[2], "126 (120-131)")
-        self.assertTrue(tree.exists(str(LYING)))
+        self.assertEqual(seated, ("seated", "2", "126 (120-131)",
+                                  "81 (80-81)", "66 (60-71)"))
+        self.assertEqual(lying[0], "lying")
+
+    def test_no_readings_no_lines(self):
+        self.assertEqual(self.main.statistics.lines, [])
 
 
 if __name__ == "__main__":

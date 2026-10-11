@@ -4,41 +4,36 @@
 # authors:  Giuseppe Costanzi (1966bc)
 # licence:  GPL-3.0-or-later, see LICENSE
 # -----------------------------------------------------------------------------
-"""The statistics of the period, one row per position (R5).
+"""The statistics of the period, one line per position (R5).
 
 Count, mean, minimum and maximum, computed by SQLite when they are shown
-(R1). The mean is shown whole: a reading is whole, and a tenth of a mmHg
-would claim a precision the device does not have.
+(R1). Labels on a grid and not a second list: there is nothing in it to
+select, and two or three lines read better as a small table than as rows
+to scroll.
+
+The mean is shown whole: a reading is whole, and a tenth of a mmHg would
+claim a precision the device does not have.
 """
 
 import tkinter as tk
 from tkinter import ttk
 
+HEADINGS = ("Position", "Readings", "Systolic", "Diastolic", "Heart rate")
 
-class Statistics(ttk.Frame):
-    """A small table: position, readings, systolic, diastolic, heart rate.
-    """
+
+class Statistics(ttk.LabelFrame):
+    """Position, readings, then mean (min-max) of the three values."""
 
     def __init__(self, parent, get_period):
-        super().__init__(parent, style="App.TFrame")
+        super().__init__(parent, text="Statistics of the period",
+                         style="App.TLabelframe", padding=(8, 2))
         self.engine = self.nametowidget(".").engine
         self.get_period = get_period
-
-        self.init_ui()
+        # The lines on show, as text, so a test reads what a person reads.
+        self.lines = []
 
         self.engine.events.subscribe("readings", self.on_changed)
         self.bind("<Destroy>", self.on_destroy, add="+")
-
-    def init_ui(self):
-        columns = (("#0", "id", tk.W, False, 0, 0),
-                   ("#1", "Position", tk.W, True, 70, 80),
-                   ("#2", "Readings", tk.CENTER, False, 80, 80),
-                   ("#3", "Systolic", tk.CENTER, False, 110, 110),
-                   ("#4", "Diastolic", tk.CENTER, False, 110, 110),
-                   ("#5", "Heart rate", tk.CENTER, False, 110, 110))
-        self.tree = self.engine.tools.get_tree(self, columns,
-                                               show="headings")
-        self.tree.configure(height=4)
 
     def get_caption(self, mean, low, high):
         """Mean with its range: 127 (110-142).
@@ -48,24 +43,44 @@ class Statistics(ttk.Frame):
         """
         return "{0} ({1}-{2})".format(int(mean + 0.5), low, high)
 
-    def set_rows(self):
-        self.engine.tools.clear_treeview(self.tree)
+    def get_lines(self):
         period = self.get_period()
         rows = []
         if period is not None:
             rows = self.engine.get_statistics(*period)
+        lines = []
         for row in rows:
-            self.tree.insert("", tk.END, iid=str(row["position_id"]),
-                             values=(row["position"], row["readings"],
-                                     self.get_caption(row["systolic_mean"],
-                                                      row["systolic_min"],
-                                                      row["systolic_max"]),
-                                     self.get_caption(row["diastolic_mean"],
-                                                      row["diastolic_min"],
-                                                      row["diastolic_max"]),
-                                     self.get_caption(row["heart_rate_mean"],
-                                                      row["heart_rate_min"],
-                                                      row["heart_rate_max"])))
+            lines.append((row["position"], str(row["readings"]),
+                          self.get_caption(row["systolic_mean"],
+                                           row["systolic_min"],
+                                           row["systolic_max"]),
+                          self.get_caption(row["diastolic_mean"],
+                                           row["diastolic_min"],
+                                           row["diastolic_max"]),
+                          self.get_caption(row["heart_rate_mean"],
+                                           row["heart_rate_min"],
+                                           row["heart_rate_max"])))
+        return lines
+
+    def set_rows(self):
+        for child in self.winfo_children():
+            child.destroy()
+        self.lines = self.get_lines()
+        if self.lines:
+            self.set_grid([HEADINGS] + self.lines)
+        else:
+            ttk.Label(self, text="No readings in the period.",
+                      style="App.TLabel").grid(row=0, column=0, sticky=tk.W)
+
+    def set_grid(self, lines):
+        for row, line in enumerate(lines):
+            for column, text in enumerate(line):
+                anchor = tk.E
+                if column == 0:
+                    anchor = tk.W
+                ttk.Label(self, text=text, style="App.TLabel",
+                          anchor=anchor).grid(row=row, column=column,
+                                              sticky=tk.EW, padx=(0, 16))
 
     def on_changed(self, row_id=None):
         self.set_rows()
