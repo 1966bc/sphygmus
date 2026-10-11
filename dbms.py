@@ -142,6 +142,11 @@ class DBMS:
         finally:
             target.close()
 
+    def get_sqlite_version(self):
+        """The version of the SQLite library the connection runs on."""
+        row = self.read(False, "SELECT sqlite_version() AS version")
+        return row["version"]
+
     def check(self):
         """Ask SQLite whether the file is sound, page by page.
 

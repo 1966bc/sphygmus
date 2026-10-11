@@ -16,6 +16,8 @@ method that decides it.
 
 import datetime
 import os
+import platform
+import sqlite3
 import shutil
 import tempfile
 import unittest
@@ -167,6 +169,45 @@ class AppTestCase(WindowTestCase):
         self.assertTrue(text.startswith("HOW TO MEASURE"))
         self.assertIn("PMC9904446", text)
         self.assertEqual(str(guide.text.cget("state")), "disabled")
+
+    def test_licence_shows_the_gpl(self):
+        self.main.on_licence()
+        self.app.update()
+        text = self.engine.windows.get("licence").text.get("1.0", "end")
+        self.assertIn("GNU GENERAL PUBLIC LICENSE", text)
+
+    def test_about_says_who_and_what_it_runs_on(self):
+        self.main.on_about()
+        self.app.update()
+        facts = dict(self.engine.windows.get("about").facts)
+        self.assertEqual(facts["Author"], "Giuseppe Costanzi (1966bc)")
+        self.assertEqual(facts["Licence"], "GPL-3.0-or-later")
+        self.assertEqual(facts["Python"], platform.python_version())
+        self.assertEqual(facts["SQLite"], sqlite3.sqlite_version)
+        for name in ("Version", "Tk", "ReportLab", "Diary"):
+            self.assertTrue(facts[name])
+
+    def test_about_in_the_demo_says_so(self):
+        folder = tempfile.mkdtemp()
+        app = App(database=os.path.join(folder, "diary.sl3"),
+                  log=Log(os.devnull), theme="clam")
+        try:
+            app.main.demo.set(True)
+            app.main.on_demo()
+            app.main.on_about()
+            app.update()
+            facts = dict(app.engine.windows.get("about").facts)
+            self.assertIn("demo", facts["Diary"])
+        finally:
+            app.set_closed()
+            shutil.rmtree(folder)
+
+    def test_licence_opens_from_about(self):
+        self.main.on_about()
+        self.app.update()
+        self.engine.windows.get("about").on_licence()
+        self.app.update()
+        self.assertIsNotNone(self.engine.windows.get("licence"))
 
     def test_report_is_written_and_opened(self):
         opened = []

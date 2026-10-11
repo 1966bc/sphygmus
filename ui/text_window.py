@@ -4,11 +4,12 @@
 # authors:  Giuseppe Costanzi (1966bc)
 # licence:  GPL-3.0-or-later, see LICENSE
 # -----------------------------------------------------------------------------
-"""How to measure: a text to read, from docs/how_to_measure.txt.
+"""A text file, to be read: How to measure, the licence.
 
-The text lives in a file and not in the code, so it is corrected without
-touching the program, and read on GitHub as it is read here. Shown read
-only; one window at a time, through the register of windows with show.
+The texts live in files and not in the code, so they are corrected without
+touching the program, and read on GitHub as they are read here. Shown read
+only, in a fixed width font, because both are laid out in columns of plain
+text. One window per text, through the register of windows with show.
 """
 
 import os
@@ -17,17 +18,21 @@ from tkinter import ttk
 
 from version import APP_NAME
 
-# The text, beside the program.
-GUIDE = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__))), "docs", "how_to_measure.txt")
+# The program's folder: the texts are paths below it.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+GUIDE = os.path.join(ROOT, "docs", "how_to_measure.txt")
+LICENCE = os.path.join(ROOT, "LICENSE")
 
 
-class Guide(tk.Toplevel):
-    """The text, and nothing to press: Escape or the X closes it."""
+class TextWindow(tk.Toplevel):
+    """A text and nothing to press: Escape or the X closes it."""
 
-    def __init__(self, parent):
-        super().__init__(parent, name="guide")
+    def __init__(self, parent, name, caption, path):
+        super().__init__(parent, name=name)
         self.engine = self.nametowidget(".").engine
+        self.caption = caption
+        self.path = path
         self.protocol("WM_DELETE_WINDOW", self.on_cancel)
         self.engine.tools.hide_me(self)
         frame = ttk.Frame(self, style="App.TFrame", padding=8)
@@ -38,8 +43,8 @@ class Guide(tk.Toplevel):
 
     def on_open(self):
         """Read the file and show it; called by the register of windows."""
-        self.title("{0} - how to measure".format(APP_NAME))
-        with open(GUIDE, "r", encoding="utf-8") as f:
+        self.title("{0} - {1}".format(APP_NAME, self.caption))
+        with open(self.path, "r", encoding="utf-8") as f:
             self.engine.tools.set_text(self.text, f.read())
         self.engine.tools.center_me(self, self.master)
         self.text.focus_set()

@@ -40,8 +40,10 @@ try:
     from reportlab.lib.units import mm
     from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer,
                                     Table, TableStyle)
+    from reportlab import Version as REPORTLAB_VERSION
     HAS_REPORTLAB = True
 except ImportError:
+    REPORTLAB_VERSION = None
     HAS_REPORTLAB = False
 
 # Greys chosen far apart: on a laser printer two colours that are obvious on

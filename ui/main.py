@@ -29,12 +29,13 @@ from tkinter import ttk
 from report import HAS_REPORTLAB, Report
 from ui.calendarium import DATE_CHANGED, Calendarium
 from ui.chart import Chart
-from ui.guide import Guide
+from ui.about import About
+from ui.text_window import GUIDE, LICENCE, TextWindow
 from ui.reading import Reading
 from ui.readings import ReadingList
 from ui.settings import Settings
 from ui.statistics import Statistics
-from version import APP_NAME, __date__, __license__, __version__
+from version import APP_NAME
 
 
 class Main(ttk.Frame):
@@ -100,6 +101,8 @@ class Main(ttk.Frame):
         helper = tk.Menu(menubar, tearoff=0)
         helper.add_command(label="How to measure", underline=0,
                            command=self.on_guide)
+        helper.add_command(label="Licence", underline=0,
+                           command=self.on_licence)
         helper.add_separator()
         helper.add_command(label="About", underline=0, command=self.on_about)
         menubar.add_cascade(label="Help", underline=0, menu=helper)
@@ -396,16 +399,18 @@ class Main(ttk.Frame):
             "settings", lambda: Settings(self.winfo_toplevel()))
 
     def on_guide(self, evt=None):
-        self.engine.windows.show("guide",
-                                 lambda: Guide(self.winfo_toplevel()))
+        self.engine.windows.show(
+            "guide", lambda: TextWindow(self.winfo_toplevel(), "guide",
+                                        "how to measure", GUIDE))
+
+    def on_licence(self, evt=None):
+        self.engine.windows.show(
+            "licence", lambda: TextWindow(self.winfo_toplevel(), "licence",
+                                          "licence", LICENCE))
 
     def on_about(self, evt=None):
-        messagebox.showinfo(
-            APP_NAME,
-            "{0} {1}, {2}\n\nA home blood pressure diary.\nIt records and"
-            " shows; it does not diagnose.\n\nGiuseppe Costanzi (1966bc)\n"
-            "{3}".format(APP_NAME, __version__, __date__, __license__),
-            parent=self.winfo_toplevel())
+        self.engine.windows.show(
+            "about", lambda: About(self.winfo_toplevel(), self.on_licence))
 
     def on_destroy(self, evt=None):
         # <Destroy> arrives for every child too: only this frame's counts.
