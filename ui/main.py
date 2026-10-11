@@ -29,6 +29,7 @@ from tkinter import ttk
 from report import HAS_REPORTLAB, Report
 from ui.calendarium import DATE_CHANGED, Calendarium
 from ui.chart import Chart
+from ui.guide import Guide
 from ui.reading import Reading
 from ui.readings import ReadingList
 from ui.settings import Settings
@@ -97,6 +98,9 @@ class Main(ttk.Frame):
         # Edit, Delete, Chart. The menu holds what is done now and then.
 
         helper = tk.Menu(menubar, tearoff=0)
+        helper.add_command(label="How to measure", underline=0,
+                           command=self.on_guide)
+        helper.add_separator()
         helper.add_command(label="About", underline=0, command=self.on_about)
         menubar.add_cascade(label="Help", underline=0, menu=helper)
 
@@ -390,6 +394,10 @@ class Main(ttk.Frame):
     def on_settings_window(self, evt=None):
         self.engine.windows.show(
             "settings", lambda: Settings(self.winfo_toplevel()))
+
+    def on_guide(self, evt=None):
+        self.engine.windows.show("guide",
+                                 lambda: Guide(self.winfo_toplevel()))
 
     def on_about(self, evt=None):
         messagebox.showinfo(

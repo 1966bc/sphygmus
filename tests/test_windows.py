@@ -149,6 +149,15 @@ class AppTestCase(WindowTestCase):
         self.assertEqual(labels, ["Database", "Demo diary", "Report...",
                                   "Settings...", "Exit"])
 
+    def test_how_to_measure_shows_the_text_and_its_source(self):
+        self.main.on_guide()
+        self.app.update()
+        guide = self.engine.windows.get("guide")
+        text = guide.text.get("1.0", "end")
+        self.assertTrue(text.startswith("HOW TO MEASURE"))
+        self.assertIn("PMC9904446", text)
+        self.assertEqual(str(guide.text.cget("state")), "disabled")
+
     def test_report_is_written_and_opened(self):
         opened = []
         self.main.set_opened = opened.append
