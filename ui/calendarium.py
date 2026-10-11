@@ -41,7 +41,7 @@ class Calendarium(ttk.LabelFrame):
     RANGES = {"day": (1, 31), "month": (1, 12), "year": (1, 9999)}
 
     def __init__(self, parent, caption="",
-                 labels=("Giorno", "Mese", "Anno")):
+                 labels=("Day", "Month", "Year")):
         super().__init__(parent, text=caption)
 
         self.labels = dict(zip(self.PARTS, labels))
@@ -163,8 +163,8 @@ def main():
     root.title("Calendarium")
 
     frame = ttk.Frame(root, padding=8)
-    start = Calendarium(frame, "Dal")
-    end = Calendarium(frame, "Al")
+    start = Calendarium(frame, "From")
+    end = Calendarium(frame, "To")
     start.set_days_ago(30)
     start.pack(side=tk.LEFT, padx=4)
     end.pack(side=tk.LEFT, padx=4)

@@ -27,7 +27,7 @@ class CalendariumTestCase(unittest.TestCase):
 
     def setUp(self):
         self.root = tk.Tk()
-        self.calendarium = Calendarium(self.root, "Dal")
+        self.calendarium = Calendarium(self.root, "From")
         self.calendarium.pack()
         self.root.update()
         self.events = []

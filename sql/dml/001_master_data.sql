@@ -10,8 +10,8 @@
 -- ---------------------------------------------------------------------------
 
 INSERT INTO positions (position_id, description, enable) VALUES
-    (1, 'seduto', 1),
-    (2, 'sdraiato', 1);
+    (1, 'seated', 1),
+    (2, 'lying', 1);
 
 -- The thresholds for blood pressure measured at home, from the ESH 2021
 -- position paper on home monitoring (Parati et al., J Hypertens 2021; free

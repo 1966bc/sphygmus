@@ -32,8 +32,9 @@ thing end up disagreeing.
 **R2. One field for date and time**, `recorded_at`, ISO 8601 down to the
 second: `2026-10-11 08:00:00`. It sorts correctly as text, SQLite's
 `date()` and `time()` read it, and a period is a plain `BETWEEN`. The
-screen and the report split it into date and time, and show the date the
-Italian way, `11/10/2026`; the database never holds a local format. Three
+screen and the report split it into date and time, and show the date day
+first, `11/10/2026`, as it is read where the diary is kept; the database
+never holds a local format. Three
 readings taken one after the other are three rows a minute apart: no
 session table is needed to know they belong together.
 
@@ -109,6 +110,7 @@ windows.
 
 ## Language
 
-English in code, comments, docstrings, log messages and these documents.
-The interface is Italian, written as Italian literals: there is one user and
-no `_()`. Stored values such as `seduto` are data and are not translated.
+English throughout: code, comments, docstrings, log messages, these
+documents, the interface, the report and the stored values (`seated`,
+`lying`). One language and no `_()`: a repository meant to be read is read
+by whoever finds it.
