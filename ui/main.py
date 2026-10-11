@@ -57,6 +57,11 @@ class Main(ttk.Frame):
         diary.add_command(label="New reading", underline=0,
                           command=self.on_new)
         diary.add_separator()
+        diary.add_command(label="Back up the diary", underline=0,
+                          command=self.on_backup)
+        diary.add_command(label="Start a new diary...", underline=0,
+                          command=self.on_fresh_diary)
+        diary.add_separator()
         diary.add_command(label="Quit", underline=0, command=root.on_exit)
         menubar.add_cascade(label="Diary", underline=0, menu=diary)
 
@@ -149,6 +154,35 @@ class Main(ttk.Frame):
             self.set_status("Select a reading in the list first.")
         else:
             self.open_reading(reading_id)
+
+    # --- the diary file ------------------------------------------------------
+
+    def on_backup(self, evt=None):
+        path = self.engine.backup()
+        self.set_status("Backed up to {0}".format(path))
+
+    def on_fresh_diary(self, evt=None):
+        """Put the diary aside and start an empty one, once asked.
+
+        A question, with No as the default: the readings leave the screen
+        and only moving a file brings them back. Nothing is deleted.
+        """
+        question = ("Start a new, empty diary?\n\nThe one in use is moved"
+                    " into the backup folder beside it, whole. Nothing is"
+                    " deleted.")
+        if messagebox.askyesno(APP_NAME, question, default=messagebox.NO,
+                               parent=self.winfo_toplevel()):
+            self.set_fresh_diary()
+
+    def set_fresh_diary(self):
+        # The form open belongs to a reading of the diary that is going.
+        form = self.engine.windows.get("reading")
+        if form is not None:
+            form.on_cancel()
+        path = self.engine.set_fresh_diary()
+        self.engine.events.notify("settings", None)
+        self.engine.events.notify("readings", None)
+        self.set_status("New diary. The old one is {0}".format(path))
 
     # --- events --------------------------------------------------------------
 

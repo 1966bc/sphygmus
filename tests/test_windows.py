@@ -16,6 +16,8 @@ method that decides it.
 
 import datetime
 import os
+import shutil
+import tempfile
 import unittest
 
 from log import Log
@@ -106,6 +108,26 @@ class AppTestCase(WindowTestCase):
         self.main.destroy()
         self.assertEqual(self.engine.events.subscribers["readings"], [])
         self.assertEqual(self.engine.events.subscribers["settings"], [])
+
+    def test_fresh_diary_empties_the_window(self):
+        folder = tempfile.mkdtemp()
+        app = App(database=os.path.join(folder, "diary.sl3"),
+                  log=Log(os.devnull), theme="clam")
+        try:
+            values = app.engine.get_reading_values(
+                app.engine.get_stored(self.get_today_at(0, 1)), SEATED, 128,
+                79, 66)
+            app.engine.add_reading(values)
+            app.engine.events.notify("readings", None)
+            app.main.on_new()
+            app.main.set_fresh_diary()
+            app.update()
+            self.assertEqual(app.main.readings.tree.get_children(), ())
+            self.assertIsNone(app.engine.windows.get("reading"))
+            self.assertIn("The old one is", app.main.status.get())
+        finally:
+            app.destroy()
+            shutil.rmtree(folder)
 
     def test_unknown_theme_is_refused(self):
         with self.assertRaises(ValueError):

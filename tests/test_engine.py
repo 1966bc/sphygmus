@@ -60,6 +60,39 @@ class EngineTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             engine.get_setting("nothing")
 
+    def add_one(self, engine):
+        values = engine.get_reading_values("2026-10-11 08:00:00", 1, 128, 79,
+                                           66)
+        engine.add_reading(values)
+
+    def test_backup_is_a_whole_copy_beside_the_diary(self):
+        engine = Engine(self.get_path(), self.log)
+        self.add_one(engine)
+        path = engine.backup()
+        engine.db.close()
+        self.assertEqual(os.path.dirname(path),
+                         os.path.join(self.folder, "backup"))
+        copy = Engine(path, self.log)
+        self.assertEqual(copy.get_reading_count(), 1)
+        copy.db.close()
+
+    def test_fresh_diary_is_empty_and_the_old_one_is_kept(self):
+        engine = Engine(self.get_path(), self.log)
+        self.add_one(engine)
+        old = engine.set_fresh_diary()
+        self.assertEqual(engine.get_reading_count(), 0)
+        self.assertEqual(engine.get_setting("systolic_threshold_mmhg"),
+                         "135")
+        engine.db.close()
+        kept = Engine(old, self.log)
+        self.assertEqual(kept.get_reading_count(), 1)
+        kept.db.close()
+
+    def test_diary_in_memory_has_no_backup(self):
+        engine = Engine(":memory:", self.log)
+        with self.assertRaises(ValueError):
+            engine.backup()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,6 +38,10 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = (os.path.join("sql", "ddl", "001_schema.sql"),
            os.path.join("sql", "dml", "001_master_data.sql"))
 
+# Where copies of the diary go: a folder beside it, so they follow the
+# diary wherever sphygmus.ini puts it.
+BACKUP_DIR = "backup"
+
 # How a moment is written in the diary (R2), and how a day is shown.
 STORED = "%Y-%m-%d %H:%M:%S"
 SHOWN_DAY = "%d/%m/%Y"
@@ -83,6 +87,49 @@ class Engine:
                       encoding="utf-8") as f:
                 self.db.write_script(f.read())
             self.log.trace("built from {0}".format(name))
+
+    def get_backup_path(self, reason):
+        """A new file in backup/, beside the diary, named for the moment.
+
+        sphygmus_20261011_083000_copy.sl3: sorted by name, sorted by date,
+        and never one over another.
+        """
+        if self.db.database == ":memory:":
+            raise ValueError("a diary in memory has no file to back up")
+        folder = os.path.join(os.path.dirname(self.db.database), BACKUP_DIR)
+        os.makedirs(folder, exist_ok=True)
+        stem = os.path.splitext(os.path.basename(self.db.database))[0]
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(folder, "{0}_{1}_{2}.sl3".format(stem, stamp,
+                                                             reason))
+
+    def backup(self):
+        """Copy the diary into backup/; return the path of the copy."""
+        path = self.get_backup_path("copy")
+        self.db.backup(path)
+        self.log.trace("backed up to {0}".format(path))
+        return path
+
+    def set_fresh_diary(self):
+        """Start a new, empty diary; return where the old one went.
+
+        The old file is moved whole into backup/, not copied and removed:
+        nothing is deleted (R6), and a diary started by mistake is undone
+        by moving the file back.
+        """
+        path = self.get_backup_path("replaced")
+        self.db.close()
+        try:
+            os.replace(self.db.database, path)
+        except OSError:
+            # The old diary is where it was: open it again before saying so.
+            self.db.set_connection()
+            raise
+        self.db.dict_tables = {}
+        self.db.set_connection()
+        self.set_schema()
+        self.log.trace("new diary; the old one is {0}".format(path))
+        return path
 
     def get_query(self, name):
         """A named query, from sql/dql: one file, readable at the shell."""

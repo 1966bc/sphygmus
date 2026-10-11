@@ -128,6 +128,18 @@ class DBMS:
 
         return written
 
+    def backup(self, path):
+        """Copy the open database into a new file at path.
+
+        SQLite's own backup, page by page: a copy of the file with the
+        operating system could catch it in the middle of a write.
+        """
+        target = sqlite3.connect(path)
+        try:
+            self.con.backup(target)
+        finally:
+            target.close()
+
     def write_script(self, script):
         """Run a whole .sql file: the schema and the master data.
 

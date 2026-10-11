@@ -3,7 +3,7 @@
 # that is written while the program is used.
 *.sl3
 *.sl3-journal
-sql/bks/
+backup/
 
 # What is written while the program runs
 sphygmus.log
