@@ -24,6 +24,7 @@ from tkinter import messagebox
 from tkinter import ttk
 
 from ui.calendarium import DATE_CHANGED, Calendarium
+from ui.chart import Chart
 from ui.reading import Reading
 from ui.readings import ReadingList
 from ui.settings import Settings
@@ -89,6 +90,8 @@ class Main(ttk.Frame):
         diary = tk.Menu(menubar, tearoff=0)
         diary.add_command(label="New reading", underline=0,
                           command=self.on_new)
+        diary.add_command(label="Chart", underline=0,
+                          command=self.on_chart)
         menubar.add_cascade(label="Diary", underline=0, menu=diary)
 
         helper = tk.Menu(menubar, tearoff=0)
@@ -128,6 +131,8 @@ class Main(ttk.Frame):
         buttons = self.engine.tools.get_button_column(
             frm_list, (("New", self.on_new),
                        ("Edit", self.on_edit),
+                       ("Delete", self.on_delete),
+                       ("Chart", self.on_chart),
                        ("Close", root.on_exit)), window=root)
         buttons.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 0))
         frm_list.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
@@ -148,6 +153,11 @@ class Main(ttk.Frame):
     def set_parts(self):
         self.readings.set_rows()
         self.statistics.set_rows()
+        # The chart is a window of its own, opened from here: it is told
+        # when the period moves, which it cannot hear by itself.
+        chart = self.engine.windows.get("chart")
+        if chart is not None:
+            chart.set_drawn()
         self.set_status()
 
     def set_status(self, message=None):
@@ -292,6 +302,18 @@ class Main(ttk.Frame):
         self.engine.events.notify("settings", None)
         self.engine.events.notify("readings", None)
         self.readings.set_first()
+
+    def on_delete(self, evt=None):
+        """The same as Delete on the list, for whoever looks for a button.
+        """
+        if self.readings.get_selected_id() is None:
+            self.set_status("Select a reading in the list first.")
+        else:
+            self.readings.on_delete()
+
+    def on_chart(self, evt=None):
+        self.engine.windows.show(
+            "chart", lambda: Chart(self.winfo_toplevel(), self.get_period))
 
     # --- events --------------------------------------------------------------
 

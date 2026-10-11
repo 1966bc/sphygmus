@@ -402,7 +402,66 @@ class SettingsTestCase(WindowTestCase):
                          "sample name")
 
 
+class ChartTestCase(WindowTestCase):
+
+    def open_chart(self):
+        self.main.on_chart()
+        self.app.update()
+        return self.engine.windows.get("chart")
+
+    def test_empty_period_says_so(self):
+        chart = self.open_chart()
+        self.assertEqual(len(chart.canvas.find_withtag("empty")), 1)
+
+    def test_one_dot_each_value_and_two_threshold_lines(self):
+        self.add(self.get_today_at(0, 1), 128, 79)
+        self.add(self.get_today_at(0, 2), 140, 90, position=LYING)
+        canvas = self.open_chart().canvas
+        self.assertEqual(len(canvas.find_withtag("systolic")), 2)
+        self.assertEqual(len(canvas.find_withtag("diastolic")), 2)
+        self.assertEqual(len(canvas.find_withtag("threshold")), 2)
+
+    def test_lying_dot_is_hollow(self):
+        self.add(self.get_today_at(0, 2), 140, 90, position=LYING)
+        canvas = self.open_chart().canvas
+        dot = canvas.find_withtag("systolic")[0]
+        self.assertEqual(canvas.itemcget(dot, "fill"), "#ffffff")
+
+    def test_higher_value_is_drawn_higher(self):
+        self.add(self.get_today_at(0, 1), 128, 79)
+        canvas = self.open_chart().canvas
+        systolic = canvas.coords(canvas.find_withtag("systolic")[0])
+        diastolic = canvas.coords(canvas.find_withtag("diastolic")[0])
+        self.assertLess(systolic[1], diastolic[1])
+
+    def test_new_reading_is_drawn(self):
+        canvas = self.open_chart().canvas
+        self.add(self.get_today_at(0, 1), 128, 79)
+        self.assertEqual(len(canvas.find_withtag("systolic")), 1)
+
+    def test_chart_follows_the_period(self):
+        self.add(self.get_today_at(0, 1), 128, 79)
+        canvas = self.open_chart().canvas
+        self.main.start.set_date(datetime.date.today()
+                                 + datetime.timedelta(days=1))
+        self.main.on_period()
+        self.assertEqual(len(canvas.find_withtag("empty")), 1)
+
+    def test_opening_twice_keeps_one_chart(self):
+        self.assertIs(self.open_chart(), self.open_chart())
+
+    def test_closed_chart_stops_listening(self):
+        self.open_chart().on_cancel()
+        self.app.update()
+        self.assertEqual(len(self.engine.events.subscribers["readings"]), 3)
+
+
 class ListTestCase(WindowTestCase):
+
+    def test_delete_without_a_selection_says_so(self):
+        self.main.on_delete()
+        self.assertIn("Select a reading", self.main.status.get())
+
 
     def test_reading_over_the_threshold_is_marked(self):
         over_id = self.add(self.get_today_at(0, 1), 135, 70)
