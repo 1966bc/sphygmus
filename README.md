@@ -1,5 +1,7 @@
 # sphygmus
 
+![sphygmus: the main window, the plot and the report, on invented readings](docs/images/banner.png)
+
 From the Greek *sphygmós*, the pulse: the root of *sphygmomanometer*.
 
 A home blood pressure diary: Python, Tkinter and SQLite, with a PDF report
