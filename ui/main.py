@@ -137,7 +137,7 @@ class Main(ttk.Frame):
             frm_list, (("New", self.on_new),
                        ("Edit", self.on_edit),
                        ("Delete", self.on_delete),
-                       ("Chart", self.on_chart),
+                       ("Plot", self.on_chart),
                        ("Close", root.on_exit)), window=root)
         frm_shown = ttk.LabelFrame(buttons, text="Show",
                                    style="App.TLabelframe", padding=4)

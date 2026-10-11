@@ -5,20 +5,27 @@ From the Greek *sphygmós*, the pulse: the root of *sphygmomanometer*.
 A home blood pressure diary: Python, Tkinter and SQLite, with a PDF report
 to take to the doctor.
 
-> **Status:** under construction. The schema and the skeleton of the
-> program are written; the windows that use them are not yet.
+![The main window, on the invented readings of the demo diary](docs/images/main.png)
 
 ## What it does
 
 - Records each reading as the device shows it: date and time, systolic,
   diastolic, heart rate, and whether it was taken seated or lying down.
-- Lists the readings and highlights those at or above the home threshold of
-  135/85 mmHg (ESH 2021). The threshold is a setting, not a constant.
-- Shows the statistics for a chosen period, by position: number of
-  readings, mean, minimum and maximum.
-- Draws the readings over time, by hand on a Tkinter canvas.
-- Prints a PDF report with ReportLab: the statistics, the chart and every
-  reading.
+  A reading is typed in its own form; the date and time follow the clock
+  until they are touched.
+- Lists the readings of a period and marks in red those at or over the
+  home threshold of 135/85 mmHg (ESH 2021). The threshold is a setting.
+- Never deletes: a correction disables the reading and stores the new one,
+  a removed reading is shown in grey on request and can be brought back.
+- Shows the statistics of the period by position: number of readings,
+  mean, minimum and maximum.
+- Plots the readings over time, drawn by hand on a Tkinter canvas.
+- Writes a PDF report with ReportLab - the statistics, the plot and every
+  reading - and opens it as a print preview.
+- Backs up, restores, checks and vacuums the diary; says how to measure,
+  after the ESH 2021 position paper.
+
+![The plot: each reading a line from diastolic to systolic, filled when seated, hollow when lying down](docs/images/chart.png)
 
 It records and shows. It does not diagnose or advise.
 

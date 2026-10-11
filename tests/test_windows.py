@@ -19,6 +19,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from tkinter import ttk
 
 from log import Log
 
@@ -148,6 +149,15 @@ class AppTestCase(WindowTestCase):
                   if menu.type(index) != "separator"]
         self.assertEqual(labels, ["Database", "Demo diary", "Report...",
                                   "Settings...", "Exit"])
+
+    def test_buttons_have_one_letter_each_and_close_is_c(self):
+        letters = {}
+        for widget in self.engine.tools.get_widgets(self.main):
+            if isinstance(widget, ttk.Button):
+                index = int(str(widget.cget("underline")))
+                letters[widget.cget("text")] = widget.cget("text")[index]
+        self.assertEqual(letters, {"New": "N", "Edit": "E", "Delete": "D",
+                                   "Plot": "P", "Close": "C"})
 
     def test_how_to_measure_shows_the_text_and_its_source(self):
         self.main.on_guide()

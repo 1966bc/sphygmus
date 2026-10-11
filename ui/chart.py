@@ -66,7 +66,7 @@ class Chart(tk.Toplevel):
                 readings.append((self.engine.get_moment(row["recorded_at"]),
                                  row["position_id"], row["systolic_mmhg"],
                                  row["diastolic_mmhg"]))
-        self.title("{0} - chart {1}".format(APP_NAME, caption))
+        self.title("{0} - plot {1}".format(APP_NAME, caption))
         self.canvas.set_data(readings, self.engine.get_threshold(), period)
 
     def on_changed(self, row_id=None):

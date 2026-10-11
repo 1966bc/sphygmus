@@ -127,7 +127,8 @@ class PressureCanvas(tk.Canvas):
                          fill=fill, width=2, tags=tag)
 
     def set_legend(self):
-        x = MARGIN_LEFT
+        # Clear of "mmHg", which ends where the plot begins.
+        x = MARGIN_LEFT + 12
         y = MARGIN_TOP / 2
         for caption, colour, position_id in (("systolic", SYSTOLIC, SEATED),
                                              ("diastolic", DIASTOLIC,
