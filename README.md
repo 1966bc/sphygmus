@@ -31,15 +31,34 @@ means stored, the threshold as data, one person and so no patient table.
 The general rules come from
 [fundamenta](https://github.com/1966bc/fundamenta).
 
-## The database
+## Running it
 
 ```bash
-sqlite3 diary.sl3 < sql/ddl/001_schema.sql
-sqlite3 diary.sl3 < sql/dml/001_master_data.sql
+python3 sphygmus.py                        # the diary named in sphygmus.ini
+python3 sphygmus.py --trace                # and print what it does
+python3 -m unittest discover -s tests      # better: under xvfb-run -a
 ```
 
-The repository carries the schema and invented sample data, never a real
-diary.
+The first start creates the diary, empty. To look around first, File >
+Demo diary opens a diary of invented readings, built afresh in a temporary
+folder and removed when it is closed: the title says DEMO while it is open.
+The same readings can be written to a file that stays:
+
+```bash
+python3 seed.py sample.sl3
+python3 sphygmus.py --database sample.sl3
+```
+
+## The database
+
+One SQLite file. A new diary is built from `sql/ddl/001_schema.sql` and
+`sql/dml/001_master_data.sql`, then by the numbered migrations in
+`sql/ddl`, which also bring an older diary up to date after copying it into
+`backup/`. File > Database backs it up, restores a backup, checks it and
+vacuums it.
+
+The repository carries the schema and the generator of invented readings,
+never a real diary.
 
 ## Requirements
 

@@ -163,9 +163,16 @@ class Reading(tk.Toplevel):
         return (self.date.get_date() == self.shown_date
                 and self.time.get() == self.shown_time)
 
-    def on_tick(self):
+    def set_clock(self):
+        """Put date and time back on the clock, unless a person moved them.
+        """
         if self.is_untouched():
             self.set_now()
+
+    def on_tick(self):
+        # The only place a tick is scheduled, so destroy() always holds
+        # the one pending and can cancel it.
+        self.set_clock()
         self.tick = self.after(TICK_MS, self.on_tick)
 
     def destroy(self):

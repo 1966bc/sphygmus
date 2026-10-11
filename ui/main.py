@@ -40,6 +40,8 @@ class Main(ttk.Frame):
         self.engine = self.nametowidget(".").engine
 
         self.status = tk.StringVar()
+        # Ticked while the demo diary is open.
+        self.demo = tk.BooleanVar(value=False)
         # The days the period was last set to from the settings: a change of
         # threshold must not move a period somebody chose by hand.
         self.period_days = self.engine.get_period_days()
@@ -56,21 +58,28 @@ class Main(ttk.Frame):
         root = self.nametowidget(".")
         menubar = tk.Menu(root, tearoff=0)
 
-        # The diary as a file: copies, checks, and leaving.
+        # The diary as a file, in a menu of its own under File: copies,
+        # checks, starting anew.
+        database = tk.Menu(menubar, tearoff=0)
+        database.add_command(label="Back up", underline=0,
+                             command=self.on_backup)
+        database.add_command(label="Restore a backup...", underline=0,
+                             command=self.on_restore)
+        database.add_separator()
+        database.add_command(label="Check", underline=0,
+                             command=self.on_check)
+        database.add_command(label="Vacuum", underline=0,
+                             command=self.on_vacuum)
+        database.add_separator()
+        database.add_command(label="Start a new diary...", underline=6,
+                             command=self.on_fresh_diary)
+
         files = tk.Menu(menubar, tearoff=0)
-        files.add_command(label="Back up the diary", underline=0,
-                          command=self.on_backup)
-        files.add_command(label="Restore a backup...", underline=0,
-                          command=self.on_restore)
+        files.add_cascade(label="Database", underline=0, menu=database)
+        files.add_checkbutton(label="Demo diary", underline=1,
+                              variable=self.demo, command=self.on_demo)
         files.add_separator()
-        files.add_command(label="Check the diary", underline=0,
-                          command=self.on_check)
-        files.add_command(label="Vacuum the diary", underline=0,
-                          command=self.on_vacuum)
-        files.add_command(label="Start a new diary...", underline=6,
-                          command=self.on_fresh_diary)
-        files.add_separator()
-        files.add_command(label="Settings...", underline=1,
+        files.add_command(label="Settings...", underline=0,
                           command=self.on_settings_window)
         files.add_separator()
         files.add_command(label="Exit", underline=1, command=root.on_exit)
@@ -88,6 +97,7 @@ class Main(ttk.Frame):
 
         root.configure(menu=menubar)
         self.mnu_file = files
+        self.mnu_database = database
         self.mnu_diary = diary
         self.mnu_help = helper
 
@@ -247,11 +257,35 @@ class Main(ttk.Frame):
         self.set_diary_replaced()
         self.set_status("New diary. The old one is {0}".format(path))
 
+    def on_demo(self, evt=None):
+        """Open the demo diary, or close it and go back to the diary.
+
+        The menu entry is a check box: ticking it has already happened when
+        this runs, so the variable says where to go.
+        """
+        self.set_forms_closed()
+        self.engine.tools.busy(self.winfo_toplevel())
+        try:
+            if self.demo.get():
+                self.engine.set_demo()
+            else:
+                self.engine.set_home()
+        finally:
+            self.engine.tools.not_busy(self.winfo_toplevel())
+        self.nametowidget(".").set_title()
+        self.set_diary_replaced()
+        if self.engine.is_demo():
+            self.set_status("Demo diary: invented readings. Untick File >"
+                            " Demo diary to go back to yours.")
+        else:
+            self.set_status("Back on your diary.")
+
     def set_forms_closed(self):
-        """The form open belongs to a reading of the diary that is going."""
-        form = self.engine.windows.get("reading")
-        if form is not None:
-            form.on_cancel()
+        """The forms open belong to the diary that is going."""
+        for name in ("reading", "settings"):
+            window = self.engine.windows.get(name)
+            if window is not None:
+                window.on_cancel()
 
     def set_diary_replaced(self):
         """Everything on screen is read again from the new file."""

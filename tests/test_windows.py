@@ -136,15 +136,67 @@ class AppTestCase(WindowTestCase):
                 labels.append(menu.entrycget(index, "label"))
         return labels
 
-    def test_file_menu_holds_the_diary_as_a_file(self):
-        self.assertEqual(self.get_labels(self.main.mnu_file),
-                         ["Back up the diary", "Restore a backup...",
-                          "Check the diary", "Vacuum the diary",
-                          "Start a new diary...", "Settings...", "Exit"])
+    def test_database_menu_holds_the_diary_as_a_file(self):
+        self.assertEqual(self.get_labels(self.main.mnu_database),
+                         ["Back up", "Restore a backup...", "Check",
+                          "Vacuum", "Start a new diary..."])
+
+    def test_file_menu_has_database_demo_settings_exit(self):
+        menu = self.main.mnu_file
+        labels = [menu.entrycget(index, "label")
+                  for index in range(menu.index("end") + 1)
+                  if menu.type(index) != "separator"]
+        self.assertEqual(labels, ["Database", "Demo diary", "Settings...",
+                                  "Exit"])
 
     def test_check_says_sound_on_the_status_bar(self):
         self.main.on_check()
         self.assertIn("sound", self.main.status.get())
+
+    def test_demo_opens_invented_readings_and_says_so(self):
+        self.main.demo.set(True)
+        self.main.on_demo()
+        self.assertTrue(self.engine.is_demo())
+        self.assertEqual(self.app.title(), "Sphygmus - DEMO")
+        self.assertGreater(len(self.tree.get_children()), 0)
+        self.assertIn("Demo diary", self.main.status.get())
+
+    def test_leaving_the_demo_brings_the_diary_back(self):
+        # A file: a diary in memory does not survive being closed.
+        folder = tempfile.mkdtemp()
+        app = App(database=os.path.join(folder, "diary.sl3"),
+                  log=Log(os.devnull), theme="clam")
+        try:
+            values = app.engine.get_reading_values(
+                app.engine.get_stored(self.get_today_at(0, 1)), SEATED, 128,
+                79, 66)
+            app.engine.add_reading(values)
+            app.main.demo.set(True)
+            app.main.on_demo()
+            demo = app.engine.demo_folder
+            app.main.demo.set(False)
+            app.main.on_demo()
+            self.assertFalse(app.engine.is_demo())
+            self.assertEqual(app.title(), "Sphygmus")
+            self.assertEqual(
+                len(app.main.readings.tree.get_children()), 1)
+            self.assertFalse(os.path.exists(demo))
+        finally:
+            app.destroy()
+            shutil.rmtree(folder)
+
+    def test_closing_in_the_demo_removes_it(self):
+        folder = tempfile.mkdtemp()
+        app = App(database=os.path.join(folder, "diary.sl3"),
+                  log=Log(os.devnull), theme="clam")
+        try:
+            app.main.demo.set(True)
+            app.main.on_demo()
+            demo = app.engine.demo_folder
+            app.set_closed()
+            self.assertFalse(os.path.exists(demo))
+        finally:
+            shutil.rmtree(folder)
 
     def test_unknown_theme_is_refused(self):
         with self.assertRaises(ValueError):
@@ -167,13 +219,13 @@ class FormTestCase(WindowTestCase):
         form = self.open_new()
         form.time.set("00:00:00")
         form.shown_time = "00:00:00"
-        form.on_tick()
+        form.set_clock()
         self.assertNotEqual(form.time.get(), "00:00:00")
 
     def test_time_touched_is_left_alone(self):
         form = self.open_new()
         form.time.set("07:30:00")
-        form.on_tick()
+        form.set_clock()
         self.assertEqual(form.time.get(), "07:30:00")
 
     def test_empty_number_is_a_problem(self):

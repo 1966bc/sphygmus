@@ -24,10 +24,12 @@ last of several.
 import datetime
 import os
 import shutil
+import tempfile
 
 from dbms import DBMS
 from events import Events
 from pressure.threshold import Threshold
+from sample import Sample
 from tools import Tools
 from version import SCHEMA_VERSION
 from windows import Windows
@@ -61,6 +63,11 @@ class Engine:
         self.events = Events(log)
         self.windows = Windows(log)
         self.db = DBMS(database, log)
+        # The diary the program was opened on, to come back to after the
+        # demo.
+        self.home = database
+        # The folder holding the demo diary while it is open, or None.
+        self.demo_folder = None
         # name -> the text of sql/dql/<name>.sql, read once.
         self.queries = {}
         self.set_schema()
@@ -200,6 +207,40 @@ class Engine:
         self.db.dict_tables = {}
         self.db.set_connection()
         self.set_schema()
+
+    # --- the demo diary ------------------------------------------------------
+
+    def is_demo(self):
+        return self.demo_folder is not None
+
+    def set_demo(self):
+        """Leave the diary for a demo one, built now in a temporary folder.
+
+        Built from scratch every time, with the invented readings of
+        sample.py: what is done to it is thrown away with it. The diary is
+        closed, not touched.
+        """
+        if not self.is_demo():
+            self.demo_folder = tempfile.mkdtemp(prefix="sphygmus_demo_")
+            self.set_switched(os.path.join(self.demo_folder, "demo.sl3"))
+            Sample(self).run()
+            self.log.trace("demo open in {0}".format(self.demo_folder))
+
+    def set_home(self):
+        """Close the demo, remove it, and open the diary again."""
+        if self.is_demo():
+            folder = self.demo_folder
+            self.set_switched(self.home)
+            self.demo_folder = None
+            # Invented readings in a folder of our own: removing it deletes
+            # no record (R6 is about the diary).
+            shutil.rmtree(folder, ignore_errors=True)
+            self.log.trace("demo closed, back on {0}".format(self.home))
+
+    def set_switched(self, path):
+        self.db.close()
+        self.db.database = path
+        self.set_reopened()
 
     def get_query(self, name):
         """A named query, from sql/dql: one file, readable at the shell."""

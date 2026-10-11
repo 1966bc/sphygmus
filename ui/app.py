@@ -35,7 +35,7 @@ class App(tk.Tk):
 
         self.engine = Engine(database, log)
 
-        self.title(APP_NAME)
+        self.set_title()
         self.set_icon()
         self.protocol("WM_DELETE_WINDOW", self.on_exit)
         self.engine.tools.set_style(theme)
@@ -88,11 +88,29 @@ class App(tk.Tk):
         return window
 
     def on_exit(self, evt=None):
-        """Close the diary and go.
+        """Close the diary and go, once asked.
 
-        No question first: nothing is left unsaved, because a reading is
-        saved when it is entered.
+        Asked every time, with No as the default: leaving closes every
+        window at once, and a click on the wrong X should cost nothing.
         """
+        if messagebox.askyesno(APP_NAME, "Close {0}?".format(APP_NAME),
+                               default=messagebox.NO,
+                               parent=self.get_active_window()):
+            self.set_closed()
+
+    def set_closed(self):
+        """The demo removed if it is open, the diary closed, the window gone.
+        """
+        self.engine.set_home()
         self.engine.db.close()
         self.engine.log.trace("diary closed")
         self.destroy()
+
+    def set_title(self):
+        """The name, and DEMO in capitals while the demo diary is open: two
+        diaries that look alike must not be told apart by memory.
+        """
+        title = APP_NAME
+        if self.engine.is_demo():
+            title = "{0} - DEMO".format(APP_NAME)
+        self.title(title)
