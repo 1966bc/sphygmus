@@ -26,12 +26,9 @@ from tkinter import ttk
 from ui.calendarium import DATE_CHANGED, Calendarium
 from ui.reading import Reading
 from ui.readings import ReadingList
+from ui.settings import Settings
 from ui.statistics import Statistics
 from version import APP_NAME, __date__, __license__, __version__
-
-# The period shown when the program starts: the last month, which is about
-# what a doctor asks to see.
-DEFAULT_DAYS = 30
 
 
 class Main(ttk.Frame):
@@ -43,11 +40,15 @@ class Main(ttk.Frame):
         self.engine = self.nametowidget(".").engine
 
         self.status = tk.StringVar()
+        # The days the period was last set to from the settings: a change of
+        # threshold must not move a period somebody chose by hand.
+        self.period_days = self.engine.get_period_days()
 
         self.init_menu()
         self.init_ui()
 
         self.engine.events.subscribe("readings", self.on_readings)
+        self.engine.events.subscribe("settings", self.on_settings)
         self.bind("<Destroy>", self.on_destroy, add="+")
         self.set_parts()
 
@@ -68,6 +69,9 @@ class Main(ttk.Frame):
                           command=self.on_vacuum)
         files.add_command(label="Start a new diary...", underline=6,
                           command=self.on_fresh_diary)
+        files.add_separator()
+        files.add_command(label="Settings...", underline=1,
+                          command=self.on_settings_window)
         files.add_separator()
         files.add_command(label="Exit", underline=1, command=root.on_exit)
         menubar.add_cascade(label="File", underline=0, menu=files)
@@ -98,7 +102,7 @@ class Main(ttk.Frame):
         frm_period = ttk.Frame(self, style="App.TFrame", padding=(8, 8, 8, 0))
         self.start = Calendarium(frm_period, "From")
         self.end = Calendarium(frm_period, "To")
-        self.start.set_days_ago(DEFAULT_DAYS)
+        self.start.set_days_ago(self.period_days)
         self.start.pack(side=tk.LEFT, padx=(0, 8))
         self.end.pack(side=tk.LEFT)
         self.start.bind(DATE_CHANGED, self.on_period)
@@ -263,6 +267,19 @@ class Main(ttk.Frame):
     def on_readings(self, row_id=None):
         self.set_status()
 
+    def on_settings(self, row_id=None):
+        """Move the period only if its number of days changed."""
+        days = self.engine.get_period_days()
+        if days != self.period_days:
+            self.period_days = days
+            self.start.set_days_ago(days)
+            self.end.set_today()
+            self.set_parts()
+
+    def on_settings_window(self, evt=None):
+        self.engine.windows.show(
+            "settings", lambda: Settings(self.winfo_toplevel()))
+
     def on_about(self, evt=None):
         messagebox.showinfo(
             APP_NAME,
@@ -275,3 +292,4 @@ class Main(ttk.Frame):
         # <Destroy> arrives for every child too: only this frame's counts.
         if evt is None or evt.widget is self:
             self.engine.events.unsubscribe("readings", self.on_readings)
+            self.engine.events.unsubscribe("settings", self.on_settings)

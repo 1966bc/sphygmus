@@ -12,7 +12,7 @@ import sqlite3
 import tempfile
 import unittest
 
-from engine import Engine
+from engine import PROJECT_DIR, SCRIPTS, Engine
 from log import Log
 from version import SCHEMA_VERSION
 
@@ -87,6 +87,54 @@ class EngineTestCase(unittest.TestCase):
         kept = Engine(old, self.log)
         self.assertEqual(kept.get_reading_count(), 1)
         kept.db.close()
+
+    def get_diary_of_schema_one(self):
+        """A diary as the first version of the program left it."""
+        con = sqlite3.connect(self.get_path())
+        for name in SCRIPTS:
+            with open(os.path.join(PROJECT_DIR, name),
+                      encoding="utf-8") as f:
+                con.executescript(f.read())
+        con.execute("INSERT INTO readings (position_id, recorded_at,"
+                    " systolic_mmhg, diastolic_mmhg, heart_rate_bpm)"
+                    " VALUES (1, '2026-10-11 08:00:00', 128, 79, 66)")
+        con.commit()
+        con.close()
+
+    def test_old_diary_is_migrated_and_keeps_its_readings(self):
+        self.get_diary_of_schema_one()
+        engine = Engine(self.get_path(), self.log)
+        self.assertEqual(engine.get_schema_version(), SCHEMA_VERSION)
+        self.assertEqual(engine.get_reading_count(), 1)
+        self.assertEqual(engine.get_period_days(), 30)
+        engine.db.close()
+
+    def test_old_diary_is_copied_before_migrating(self):
+        self.get_diary_of_schema_one()
+        engine = Engine(self.get_path(), self.log)
+        names = os.listdir(engine.get_backup_folder())
+        engine.db.close()
+        self.assertEqual(len(names), 1)
+        self.assertTrue(names[0].endswith("_schema1.sl3"))
+        copy = os.path.join(self.folder, "backup", names[0])
+        con = sqlite3.connect(copy)
+        version = con.execute("PRAGMA user_version").fetchone()[0]
+        con.close()
+        self.assertEqual(version, 1)
+
+    def test_new_diary_is_not_copied(self):
+        engine = Engine(self.get_path(), self.log)
+        self.assertFalse(os.path.exists(engine.get_backup_folder()))
+        engine.db.close()
+
+    def test_new_and_migrated_diaries_have_the_same_settings(self):
+        self.get_diary_of_schema_one()
+        migrated = Engine(self.get_path(), self.log)
+        fresh = Engine(":memory:", self.log)
+        sql = "SELECT code, value, description FROM settings ORDER BY code"
+        self.assertEqual([tuple(row) for row in migrated.db.read(True, sql)],
+                         [tuple(row) for row in fresh.db.read(True, sql)])
+        migrated.db.close()
 
     def test_sound_diary_checks_ok(self):
         engine = Engine(self.get_path(), self.log)

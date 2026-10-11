@@ -140,7 +140,7 @@ class AppTestCase(WindowTestCase):
         self.assertEqual(self.get_labels(self.main.mnu_file),
                          ["Back up the diary", "Restore a backup...",
                           "Check the diary", "Vacuum the diary",
-                          "Start a new diary...", "Exit"])
+                          "Start a new diary...", "Settings...", "Exit"])
 
     def test_check_says_sound_on_the_status_bar(self):
         self.main.on_check()
@@ -282,6 +282,72 @@ class FormTestCase(WindowTestCase):
         self.app.update()
         self.assertIsNone(self.get_form())
         self.assertEqual(self.engine.get_reading_count(), 0)
+
+
+class SettingsTestCase(WindowTestCase):
+
+    def open_settings(self):
+        self.main.on_settings_window()
+        self.app.update()
+        return self.engine.windows.get("settings")
+
+    def test_settings_open_with_the_diary_values(self):
+        window = self.open_settings()
+        self.assertEqual(window.systolic.get(), "135")
+        self.assertEqual(window.diastolic.get(), "85")
+        self.assertEqual(window.period_days.get(), "30")
+
+    def test_opening_twice_keeps_one_window(self):
+        first = self.open_settings()
+        second = self.open_settings()
+        self.assertIs(first, second)
+
+    def test_threshold_not_a_number_is_a_problem(self):
+        window = self.open_settings()
+        window.systolic.set("")
+        self.assertIn("thresholds", window.get_problem())
+
+    def test_systolic_threshold_below_diastolic_is_a_problem(self):
+        window = self.open_settings()
+        window.systolic.set("80")
+        self.assertIn("thresholds", window.get_problem())
+
+    def test_zero_days_is_a_problem(self):
+        window = self.open_settings()
+        window.period_days.set("0")
+        self.assertIn("from 1", window.get_problem())
+
+    def test_save_redraws_the_marks(self):
+        reading_id = self.add(self.get_today_at(0, 1), 132, 70)
+        window = self.open_settings()
+        window.systolic.set("130")
+        window.diastolic.set("80")
+        window.on_save()
+        self.app.update()
+        self.assertIsNone(self.engine.windows.get("settings"))
+        self.assertEqual(self.tree.item(str(reading_id), "tags"), ("over",))
+
+    def test_new_days_move_the_period(self):
+        window = self.open_settings()
+        window.period_days.set("7")
+        window.on_save()
+        self.assertEqual(self.main.start.get_date(),
+                         datetime.date.today() - datetime.timedelta(days=7))
+
+    def test_new_threshold_leaves_a_period_chosen_by_hand(self):
+        chosen = datetime.date.today() - datetime.timedelta(days=3)
+        self.main.start.set_date(chosen)
+        window = self.open_settings()
+        window.systolic.set("130")
+        window.on_save()
+        self.assertEqual(self.main.start.get_date(), chosen)
+
+    def test_name_is_saved_without_extra_spaces(self):
+        window = self.open_settings()
+        window.patient_name.set("  sample   name ")
+        window.on_save()
+        self.assertEqual(self.engine.get_setting("patient_name"),
+                         "sample name")
 
 
 class ListTestCase(WindowTestCase):

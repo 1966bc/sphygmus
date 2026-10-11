@@ -35,9 +35,13 @@ from windows import Windows
 # The folder of this file: the .sql files that build a new diary are here.
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# The files that build an empty diary, in this order.
+# The files that build an empty diary of schema 1, in this order.
 SCRIPTS = (os.path.join("sql", "ddl", "001_schema.sql"),
            os.path.join("sql", "dml", "001_master_data.sql"))
+
+# The schema version each migration brings a diary to, and its file. A new
+# diary runs them too, after SCRIPTS: there is one way to be at a version.
+MIGRATIONS = {2: os.path.join("sql", "ddl", "002_period_setting.sql")}
 
 # Where copies of the diary go: a folder beside it, so they follow the
 # diary wherever sphygmus.ini puts it.
@@ -69,25 +73,45 @@ class Engine:
         return row["user_version"]
 
     def set_schema(self):
-        """Build a new diary, or check that this one is the expected kind.
+        """Build a new diary, or bring this one up to SCHEMA_VERSION.
 
         A file just created by sqlite3.connect has no tables and version 0:
-        it is built from the same .sql files a reader can run at the shell.
-        A file of another version is refused, and nothing is written to it.
+        it is built from the same .sql files a reader can run at the shell,
+        and then migrated like any other. An older diary is copied into
+        backup/ before its first migration. A diary newer than the program
+        is refused, and nothing is written to it.
         """
         version = self.get_schema_version()
-        if version == 0:
-            self.set_new_diary()
-        elif version != SCHEMA_VERSION:
+        if version > SCHEMA_VERSION:
             raise ValueError("the diary has schema {0}, this program reads {1}"
                              .format(version, SCHEMA_VERSION))
+        if version == 0:
+            self.set_new_diary()
+        elif version < SCHEMA_VERSION and self.db.database != ":memory:":
+            path = self.get_backup_path("schema{0}".format(version))
+            self.db.backup(path)
+            self.log.trace("before migrating, copied to {0}".format(path))
+        self.set_migrated()
 
     def set_new_diary(self):
         for name in SCRIPTS:
-            with open(os.path.join(PROJECT_DIR, name), "r",
-                      encoding="utf-8") as f:
-                self.db.write_script(f.read())
-            self.log.trace("built from {0}".format(name))
+            self.set_script(name)
+
+    def set_migrated(self):
+        """Run every migration the diary has not had, in order.
+
+        Each file sets user_version itself, inside its own transaction, so
+        a migration that fails leaves the diary at the version before it.
+        """
+        first = self.get_schema_version() + 1
+        for version in range(first, SCHEMA_VERSION + 1):
+            self.set_script(MIGRATIONS[version])
+
+    def set_script(self, name):
+        with open(os.path.join(PROJECT_DIR, name), "r",
+                  encoding="utf-8") as f:
+            self.db.write_script(f.read())
+        self.log.trace("ran {0}".format(name))
 
     def get_backup_folder(self):
         return os.path.join(os.path.dirname(self.db.database), BACKUP_DIR)
@@ -231,6 +255,14 @@ class Engine:
             self.get_setting(code)
             statements.append((sql, (value, code)))
         self.db.write_all(statements)
+
+    def get_period_days(self):
+        """How many days back the period starts when the program opens."""
+        text = self.get_setting("period_days").strip()
+        if not text.isdecimal() or int(text) <= 0:
+            raise ValueError("period_days is not a number of days: {0!r}"
+                             .format(text))
+        return int(text)
 
     def get_threshold(self):
         return Threshold(self.get_setting("systolic_threshold_mmhg"),

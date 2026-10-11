@@ -16,4 +16,4 @@ __license__ = "GPL-3.0-or-later"
 # The schema this program is written for: PRAGMA user_version of the diary.
 # It changes with a numbered migration in sql/ddl, and a diary of another
 # version is refused at startup rather than read wrong.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
