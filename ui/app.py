@@ -28,6 +28,9 @@ class App(tk.Tk):
         # run there is no interpreter behind self, and self.title() would
         # look for one forever.
         super().__init__(className="sphygmus")
+        # Built hidden and shown in place: otherwise the window appears
+        # empty in a corner, fills in, and jumps.
+        self.withdraw()
 
         self.engine = Engine(database, log)
 
@@ -37,6 +40,12 @@ class App(tk.Tk):
 
         self.main = Main(self)
         self.main.pack(fill=tk.BOTH, expand=1)
+
+        # The root has no parent, so center_me places it on the screen: in
+        # the middle across, a third of the way down.
+        self.engine.tools.center_me(self)
+        # Where the day starts: the first number of a reading.
+        self.main.entry.ent_systolic.focus_set()
         self.engine.log.trace("ready")
 
     def report_callback_exception(self, exc, val, tb):

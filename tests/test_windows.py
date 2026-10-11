@@ -70,6 +70,14 @@ class AppTestCase(WindowTestCase):
         self.assertEqual(self.app.winfo_class(), "Sphygmus")
         self.assertEqual(self.app.tk.call("tk", "appname"), "sphygmus")
 
+    def test_opens_centred_across_the_screen(self):
+        middle = self.app.winfo_rootx() + self.app.winfo_width() / 2
+        self.assertAlmostEqual(middle, self.app.winfo_screenwidth() / 2,
+                               delta=2)
+
+    def test_opens_with_the_keyboard_on_systolic(self):
+        self.assertIs(self.app.focus_get(), self.entry.ent_systolic)
+
     def test_title_is_the_name(self):
         self.assertEqual(self.app.title(), "Sphygmus")
 
